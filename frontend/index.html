@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<!-- BUILD: LJ Radar Imob v22.50 · Filtros de Qualidade · 01/09/2026 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://viacep.com.br https://brasilapi.com.br; font-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<title>LJ Radar Imob</title>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"></script>
+<script src="./lji-config.js?v=22.50.1"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <link rel="stylesheet" href="./app.css?v=22.50.1">
+</head>
+<body data-theme="champagne">
+
+<div id="ljiAuthOverlay" class="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="lj-radar-logo" aria-hidden="true">
+<svg viewBox="0 0 48 48" role="img">
+  <circle cx="24" cy="24" r="21"></circle>
+  <circle cx="24" cy="24" r="13"></circle>
+  <circle cx="24" cy="24" r="5"></circle>
+  <path d="M24 24 L39 12"></path>
+  <circle class="radar-dot" cx="35.5" cy="15" r="2.2"></circle>
+</svg>
+</span>
+      <div>
+        <h2>LJ Radar Imob</h2>
+        <div class="small">Acesso seguro</div>
+      </div>
+    </div>
+    <p>Entre com o mesmo usuário autorizado no Supabase do LJ Radar.</p>
+    <div class="auth-field">
+      <label>E-mail</label>
+      <input id="ljiAuthEmail" type="email" autocomplete="username" placeholder="seu@email.com">
+    </div>
+    <div class="auth-field">
+      <label>Senha</label>
+      <div class="password-input-wrap">
+        <input id="ljiAuthPassword" type="password" autocomplete="current-password" placeholder="Sua senha">
+        <button type="button" class="password-visibility" data-password-target="ljiAuthPassword" aria-label="Mostrar senha">Mostrar</button>
+      </div>
+    </div>
+    <a id="ljiForgotPassword" class="auth-forgot">Esqueceu sua senha?</a>
+    <button id="ljiAuthLogin" class="primary" type="button">Entrar</button>
+    <div id="ljiAuthError" class="auth-error"></div>
+    <div id="ljiAuthSuccess" class="auth-success"></div>
+    <div class="auth-info">Acesso restrito aos usuários autorizados.</div>
+  </div>
+</div>
+
+<div id="ljiRecoveryOverlay" class="recovery-overlay hidden">
+  <div class="recovery-card">
+    <div class="auth-brand">
+      <span class="lj-radar-logo" aria-hidden="true">
+<svg viewBox="0 0 48 48" role="img">
+  <circle cx="24" cy="24" r="21"></circle>
+  <circle cx="24" cy="24" r="13"></circle>
+  <circle cx="24" cy="24" r="5"></circle>
+  <path d="M24 24 L39 12"></path>
+  <circle class="radar-dot" cx="35.5" cy="15" r="2.2"></circle>
+</svg>
+</span>
+      <div>
+        <h2>Definir nova senha</h2>
+        <div class="small">Recuperação segura</div>
+      </div>
+    </div>
+    <p>Crie uma nova senha para sua conta do LJ Radar Imob.</p>
+
+    <div class="recovery-field">
+      <label>Nova senha</label>
+      <div class="password-input-wrap"><input id="ljiNewPassword" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"><button type="button" class="password-visibility" data-password-target="ljiNewPassword" aria-label="Mostrar senha">Mostrar</button></div>
+    </div>
+
+    <div class="recovery-field">
+      <label>Confirmar nova senha</label>
+      <div class="password-input-wrap"><input id="ljiConfirmPassword" type="password" autocomplete="new-password" placeholder="Digite novamente"><button type="button" class="password-visibility" data-password-target="ljiConfirmPassword" aria-label="Mostrar senha">Mostrar</button></div>
+    </div>
+
+    <button id="ljiSavePassword" class="primary" type="button">Salvar nova senha</button>
+    <div id="ljiRecoveryError" class="recovery-error"></div>
+    <div id="ljiRecoverySuccess" class="recovery-success"></div>
+  </div>
+</div>
+
+<div class="app">
+<aside class="sidebar">
+  <button class="sidebar-user" type="button" onclick="openSettingsPanel()" title="Ver conta">
+    <span class="avatar" id="currentUserAvatar">—</span>
+    <span class="sidebar-user-meta">
+      <strong id="currentUserName">Usuário</strong>
+      <span class="small" id="currentUserRole">Carregando perfil...</span>
+      <span class="sidebar-user-status"><i></i>Conectado</span>
+    </span>
+  </button>
+  <div class="nav">
+    <button class="nav-priority" data-page="para-quinto-andar"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>Leads 5ºAndar <span id="paraQaNavCount" class="nav-count nav-count-gold"></span></button>
+    <button class="active" data-page="dashboard"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M9 21V12h6v9"/></svg>Dashboard</button>
+    <button class="nav-priority" data-page="action-center"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h8l-1 8 11-13h-8z"/></svg>Central de Ação <span id="actionCenterNavCount" class="nav-count nav-count-gold"></span></button>
+    <button class="nav-priority" data-page="pipeline"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>Pipeline Comercial <span id="pipelineNavCount" class="nav-count nav-count-gold"></span></button>
+    <button class="nav-priority" data-page="sales-inbox"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>Inbox Comercial <span id="salesInboxNavCount" class="nav-count nav-count-gold"></span></button>
+    <button class="nav-priority" data-page="whatsapp-leads"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Leads com WhatsApp <span id="whatsappNavCount" class="nav-count">0</span></button>
+    <button class="nav-priority" data-page="intentions"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Radar de Intenção</button>
+    <button class="nav-priority" data-page="matches"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Match Engine <span id="mtMatchesBadge" class="nav-count nav-count-gold"></span></button>
+    <button class="nav-priority" data-page="trades"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>Permutas <span id="tradeNavCount" class="nav-count"></span></button>
+    <button data-page="buyers"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Demandas de compradores</button>
+    <button data-page="owners"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="9" y1="2" x2="9" y2="22"/><line x1="15" y1="2" x2="15" y2="22"/></svg>Proprietários</button>
+    <button data-page="registry"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>Pesquisa Registral</button>
+    <button data-page="contact-check"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Verificação de Contato</button>
+    <button data-page="discarded"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Descartados / não aprovados <span id="discardedNavCount" class="nav-count"></span></button>
+    <button data-page="deep-search"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="14" x2="20" y2="14"/></svg>Captação de proprietários</button>
+    <button data-page="imports"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Importação técnica</button>
+    <button data-page="companies"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><line x1="9" y1="21" x2="9" y2="14"/><line x1="15" y1="21" x2="15" y2="14"/></svg>Empresas</button>
+    <button data-page="history"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>Histórico</button>
+    <button data-page="reports"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Relatórios</button>
+    <button data-page="charts"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="14"/></svg>Gráficos da operação</button>
+    <button data-page="users-admin"><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>Usuários e permissões</button>
+  </div>
+  <div class="sidebar-bottom"><button class="secondary" style="width:100%;padding:7px 9px" onclick="window.LJI_BACKEND?.client?.auth.signOut().then(()=>location.reload())">Sair</button><div class="sidebar-version">LJ Radar Imob v22.50 · © 2026</div></div>
+</aside>
+
+<div class="app-right">
+<header class="topbar">
+  <div class="topbar-brand"><span class="lj-radar-logo" aria-hidden="true">
+<svg viewBox="0 0 48 48" role="img">
+  <circle cx="24" cy="24" r="21"></circle>
+  <circle cx="24" cy="24" r="13"></circle>
+  <circle cx="24" cy="24" r="5"></circle>
+  <path d="M24 24 L39 12"></path>
+  <circle class="radar-dot" cx="35.5" cy="15" r="2.2"></circle>
+</svg>
+</span><span class="topbar-brand-text">LJ Radar<small>Imobiliário</small></span></div>
+  <div class="topbar-actions">
+    <button id="alertsBellBtn" class="alerts-bell" type="button" onclick="openAlertsPanel(event)" title="Alertas de match">🔔<span id="alertsBellCount" class="nav-count nav-count-gold alerts-bell-count"></span></button>
+    <button class="secondary topbar-settings" type="button" onclick="openSettingsPanel()">⚙ Configurações</button>
+    <span class="status-pill"><i></i><strong id="backendStatus">Sincronizando...</strong></span>
+  </div>
+</header>
+<main>
+
+<section id="para-quinto-andar" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Leads 5ºAndar</h1><p>Imóveis captados (aluguel ou venda) que ainda não estão anunciados no QuintoAndar. Aqui é a primeira parada: confirmar o proprietário e conseguir o WhatsApp direto antes de qualquer outra coisa.</p></div>
+    <div class="top-actions export-actions">
+      <button class="secondary" onclick="verifyOpenLeadsNow()">Verificar QuintoAndar</button>
+      <button class="secondary" onclick="exportParaQuintoAndarExcel()">Excel</button>
+      <button class="secondary" onclick="exportParaQuintoAndarPdf()">PDF</button>
+    </div>
+  </div>
+  <div id="paraQaBanner" class="para-qa-banner is-empty">Nenhum lead novo desde a última visita.</div>
+  <div class="grid4 whatsapp-kpis">
+    <div class="card kpi-clickable" role="button" tabindex="0" title="Mostrar todos os leads" onclick="pqaFilterByContact('')"><div class="metric-label">Fora do QuintoAndar</div><div class="metric-value" id="pqaTotal">0</div><div class="metric-sub">leads ativos</div></div>
+    <div class="card kpi-clickable" role="button" tabindex="0" title="Filtrar: só quem tem WhatsApp" onclick="pqaFilterByContact('whatsapp')"><div class="metric-label">Com WhatsApp</div><div class="metric-value" id="pqaWhatsapp">0</div><div class="metric-sub">contato direto pronto</div></div>
+    <div class="card kpi-clickable" role="button" tabindex="0" title="Filtrar: só telefone, sem WhatsApp" onclick="pqaFilterByContact('phone')"><div class="metric-label">Só telefone</div><div class="metric-value" id="pqaPhone">0</div><div class="metric-sub">sem WhatsApp confirmado</div></div>
+    <div class="card kpi-clickable" role="button" tabindex="0" title="Filtrar: sem contato, revisar" onclick="pqaFilterByContact('missing')"><div class="metric-label">Sem contato</div><div class="metric-value" id="pqaMissing">0</div><div class="metric-sub">buscar até a última fonte</div></div>
+  </div>
+  <div class="notice search-scope-note"><strong>Regra:</strong> a busca prioriza sempre o WhatsApp do proprietário. Quando não houver WhatsApp público, o Radar mantém o telefone e a origem do anúncio para você buscar mais a fundo manualmente.</div>
+  <div class="toolbar whatsapp-toolbar" style="grid-template-columns:minmax(260px,1fr) 200px!important">
+    <input id="pqaSearch" placeholder="Buscar nome, imóvel, região ou origem..." oninput="renderParaQuintoAndar()">
+    <select id="pqaContactFilter" onchange="renderParaQuintoAndar()"><option value="">Todos os contatos</option><option value="whatsapp">Com WhatsApp</option><option value="phone">Só telefone</option><option value="missing">Sem contato · revisar</option></select>
+  </div>
+  <div class="card"><div id="paraQuintoAndarTable"></div></div>
+</section>
+
+<section id="dashboard" class="page">
+
+  <header class="dash-command-header">
+    <div class="dash-mobile-brand" aria-label="LJ Radar Imob">
+      <span class="dash-mobile-logo">◎</span><strong>LJ Radar Imob</strong>
+    </div>
+    <div class="dash-command-greeting">
+      <h1><span id="dashGreetingText">Bom dia</span>, <span id="dashGreetingName">Usuário</span> <span class="dash-wave">👋</span></h1>
+      <p>Aqui está o panorama da sua operação hoje.</p>
+    </div>
+    <div class="dash-global-search">
+      <span class="dash-search-icon">⌕</span>
+      <input id="dashGlobalSearch" placeholder="Buscar imóveis, proprietários, leads..." onkeydown="if(event.key==='Enter')dashboardGlobalSearch()">
+      <kbd>Enter</kbd>
+    </div>
+    <div class="dash-command-right">
+      <div id="dashConnectedState" class="dash-connected-pill" role="status" aria-live="polite"><span class="dash-connected-dot"></span><strong id="dashConnectedLabel">Conectado</strong></div>
+      <button class="dash-icon-btn" type="button" onclick="go('whatsapp-leads')" title="Leads com WhatsApp">◉</button>
+      <button class="dash-icon-btn" type="button" onclick="go('settings')" title="Configurações">⚙</button>
+      <div class="dash-date-pill"><span>▣</span><strong id="dashTodayDate">Hoje</strong></div>
+    </div>
+  </header>
+
+  <div class="manual-capture manual-capture-compact" id="manualCaptureDash">
+    <div class="manual-capture-head">
+      <strong>Capturar lead de um link</strong>
+      <span>Facebook · Instagram · OLX · Threads · X · Telegram · TikTok · YouTube · web aberta</span>
+    </div>
+    <div class="manual-capture-row">
+      <input id="manualCaptureUrlDash" type="url" inputmode="url" placeholder="Cole aqui o link do post ou anúncio..."
+             onkeydown="if(event.key==='Enter')runManualCapture('Dash')">
+      <select id="manualCaptureCityDash" title="Deixe em automático; só escolha se o sistema não identificar a cidade">
+        <option value="">Cidade: detectar</option>
+        <option value="São Caetano do Sul">São Caetano do Sul</option>
+        <option value="Santo André">Santo André</option>
+        <option value="São Bernardo do Campo">São Bernardo do Campo</option>
+        <option value="Diadema">Diadema</option>
+        <option value="Mauá">Mauá</option>
+        <option value="Ribeirão Pires">Ribeirão Pires</option>
+        <option value="São Paulo">São Paulo</option>
+      </select>
+      <button class="primary" id="manualCaptureBtnDash" onclick="runManualCapture('Dash')">Capturar</button>
+    </div>
+    <div class="manual-capture-result" id="manualCaptureResultDash" hidden></div>
+  </div>
+
+  <div class="dash-kpis dash-kpis-modern">
+    <button class="dash-kpi dash-kpi-link" type="button" onclick="go('owners')"><span class="kpi-icon ok">⌂</span><div><small>Imóveis na base</small><strong id="mOwners">0</strong><em id="mOwnersMeta">histórico preservado</em><span class="kpi-open">Abrir →</span></div></button>
+    <button class="dash-kpi dash-kpi-link" type="button" onclick="go('owners')"><span class="kpi-icon plus">＋</span><div><small>Novos hoje</small><strong id="mNew7">0</strong><em>entradas novas na base</em><span class="kpi-open">Abrir →</span></div></button>
+    <button class="dash-kpi dash-kpi-link" type="button" onclick="go('matches')"><span class="kpi-icon fire">✦</span><div><small>Prioridades</small><strong id="mPriority">0</strong><em>matches quentes</em><span class="kpi-open">Abrir →</span></div></button>
+    <button class="dash-kpi dash-kpi-link" type="button" onclick="go('owners')"><span class="kpi-icon user">♙</span><div><small>Sem responsável</small><strong id="mUnassigned">—</strong><em>leads atuais</em><span class="kpi-open">Abrir →</span></div></button>
+    <button class="dash-kpi dash-kpi-link" type="button" onclick="go('matches')"><span class="kpi-icon score">◎</span><div><small>Score médio</small><strong id="mAvgScore">0</strong><em>matches reais</em><span class="kpi-open">Abrir →</span></div></button>
+  </div>
+
+  <button class="dash-action-center-banner" type="button" onclick="go('action-center')">
+    <span class="dash-action-icon">⚡</span>
+    <span class="dash-action-copy"><strong><b id="dashActionCount">0</b> ações prioritárias agora</strong><small>O Radar já ordenou o que merece atenção comercial primeiro.</small></span>
+    <span class="dash-action-open">Abrir Central de Ação →</span>
+  </button>
+
+  <section class="dash-top-opportunities-section">
+    <div class="dash-modern-section-head">
+      <div><span class="dash-section-star">✦</span><div><h2>3 melhores oportunidades do dia</h2><p>Oportunidades reais com maior potencial de abordagem agora.</p></div></div>
+      <button type="button" onclick="go('owners')">Ver todas as oportunidades →</button>
+    </div>
+    <div id="dashTop3" class="dash-top3-grid-modern"><div class="empty">Carregando oportunidades do dia...</div></div>
+  </section>
+  <div id="ceoControlStrip" class="role-console role-console-ceo">
+    <div class="role-console-title">
+      <span>Central do CEO</span>
+      <small>Controles exclusivos de administração da plataforma</small>
+    </div>
+    <div class="role-console-actions">
+      <button onclick="openSettingsTab('users')">Usuários e acessos</button>
+      <button onclick="openSettingsTab('commercial')">Regras comerciais</button>
+      <button onclick="openSettingsTab('coverage')">Cobertura</button>
+      <button onclick="openSettingsTab('integrations')">Integrações</button>
+      <button onclick="openSettingsTab('security')">Segurança</button>
+      <button onclick="go('imports')">Importação técnica</button>
+    </div>
+  </div>
+
+  <div id="managerControlStrip" class="role-console role-console-manager">
+    <div class="role-console-title">
+      <span>Gestão operacional</span>
+      <small>Operação comercial, distribuição e acompanhamento</small>
+    </div>
+    <div class="role-console-actions">
+      <button onclick="go('owners')">Proprietários</button>
+      <button onclick="go('intentions')">Radar de Intenção</button>
+      <button onclick="go('matches')">Matches</button>
+      <button onclick="go('pipeline')">Pipeline comercial</button>
+      <button onclick="go('reports')">Relatórios</button>
+    </div>
+  </div>
+
+
+  <div class="dash-analytics-row">
+    <div class="card ops-dashboard-card ops-dashboard-modern">
+      <div class="section-head ops-chart-head">
+        <div><h2>Evolução da operação</h2><span class="small">Captação e inteligência comercial em dados reais</span></div>
+        <button class="secondary" onclick="go('charts')">Ver gráficos completos →</button>
+      </div>
+      <div id="dashboardOpsChart" class="ops-chart-empty">Carregando evolução da operação...</div>
+    </div>
+    <div class="dash-insight-card">
+      <div class="dash-insight-title"><span>◉</span><div><strong>Resumo de operação</strong><small>O que merece atenção agora</small></div></div>
+      <div id="dashboardOpsHighlights" class="ops-side-content">Carregando resumo...</div>
+    </div>
+    <div class="dash-hot-card">
+      <div class="dash-insight-title"><span>⚡</span><div><strong>Leads mais quentes</strong><small>Contato disponível para ação</small></div></div>
+      <div id="dashboardHotLeads" class="dash-hot-list">Carregando leads...</div>
+      <button class="dash-hot-more" type="button" onclick="go('whatsapp-leads')">Ver todos os leads →</button>
+    </div>
+  </div>
+
+  <div class="dash-filters">
+    <div class="dash-segment">
+      <button class="active" data-dashtx="" onclick="setDashTx(this,'')">Todos</button>
+      <button data-dashtx="sale" onclick="setDashTx(this,'sale')">Venda</button>
+      <button data-dashtx="rent" onclick="setDashTx(this,'rent')">Locação</button>
+    </div>
+    <select id="dashRegion" onchange="renderDashboard()"><option value="">Todas as regiões</option></select>
+    <select id="dashSort" onchange="renderDashboard()">
+      <option value="recent">Mais recentes</option>
+      <option value="price_desc">Maior valor</option>
+      <option value="price_asc">Menor valor</option>
+    </select>
+    <button class="dash-filter-btn" onclick="go('owners')">☷ Filtros avançados</button>
+    <button class="dash-filter-btn" onclick="exportDashboardExcel()">Excel</button>
+    <button class="dash-filter-btn" onclick="exportDashboardPdf()">PDF</button>
+  </div>
+
+  <div class="dash-main-grid">
+    <div class="dash-opportunities">
+      <div class="dash-section-title"><div><h2>Oportunidades confirmadas</h2><span id="dashCountLabel">0 oportunidades</span></div><button onclick="go('owners')">Ver todas</button></div>
+      <div id="dashOwners" class="dash-owner-list"></div>
+    </div>
+
+    <aside class="dash-right-column">
+      <div class="dash-widget">
+        <div class="dash-widget-title"><h3>Atividades recentes</h3></div>
+        <div id="dashActivities"></div>
+      </div>
+      <div class="dash-widget">
+        <div class="dash-widget-title"><h3>Performance da operação</h3></div>
+        <div class="dash-performance">
+          <div><small>Matches</small><strong id="mMatches">0</strong></div>
+          <div><small>Quentes</small><strong id="mHot">0</strong></div>
+          <div><small>Intenções</small><strong id="mIntentions">0</strong></div>
+        </div>
+      </div>
+      <div class="dash-widget">
+        <div class="dash-widget-title"><h3>Distribuição por região</h3></div>
+        <div id="dashRegions"></div>
+      </div>
+    </aside>
+  </div>
+
+</section>
+
+<section id="action-center" class="page hidden">
+  <div class="top action-center-top">
+    <div class="title">
+      <h1>Central de Ação</h1>
+      <p>O Radar cruza recência, score, contato, match e responsável para dizer o que merece ação comercial primeiro.</p>
+    </div>
+    <div class="top-actions">
+      <button class="secondary" onclick="refreshActionCenterNow()">Atualizar agora</button>
+      <button class="secondary" onclick="go('matches')">Abrir Match Engine</button>
+    </div>
+  </div>
+
+  <div class="action-kpis">
+    <div class="card action-kpi action-kpi-urgent"><span>Urgentes agora</span><strong id="acUrgent">0</strong><small>ação imediata</small></div>
+    <div class="card action-kpi"><span>Alta prioridade</span><strong id="acHigh">0</strong><small>score comercial ≥ 80</small></div>
+    <div class="card action-kpi"><span>Sem responsável</span><strong id="acUnassigned">0</strong><small>oportunidades atuais</small></div>
+    <div class="card action-kpi"><span>Revalidar</span><strong id="acRevalidate">0</strong><small>último sinal há 24h+</small></div>
+  </div>
+
+  <div class="action-principle">
+    <div><span class="action-principle-icon">◎</span><div><strong id="actionCenterHeadline">Priorizando oportunidades reais...</strong><small id="actionCenterSubline">Nenhuma resposta genérica: cada recomendação explica o motivo.</small></div></div>
+    <button class="secondary" onclick="go('whatsapp-leads')">Leads com contato →</button>
+  </div>
+
+  <div class="toolbar action-toolbar">
+    <input id="actionSearch" placeholder="Buscar pessoa, imóvel, cidade ou origem..." oninput="renderActionCenter()">
+    <select id="actionTypeFilter" onchange="renderActionCenter()">
+      <option value="">Todas as ações</option>
+      <option value="match">Matches</option>
+      <option value="contact">Contato agora</option>
+      <option value="assignment">Atribuir responsável</option>
+      <option value="revalidate">Revalidar lead</option>
+      <option value="verify">Verificar contato</option>
+    </select>
+    <select id="actionPriorityFilter" onchange="renderActionCenter()">
+      <option value="">Todas as prioridades</option>
+      <option value="urgent">Urgentes</option>
+      <option value="high">Alta</option>
+      <option value="normal">Normal</option>
+    </select>
+  </div>
+
+  <div class="card action-list-card">
+    <div class="section-head"><div><h2>Próximas melhores ações</h2><span class="small">Ordenadas por potencial + urgência + recência</span></div><span id="actionCenterCount" class="badge good">0</span></div>
+    <div id="actionCenterList" class="action-list"><div class="empty">Carregando prioridades reais...</div></div>
+  </div>
+</section>
+
+
+<section id="pipeline" class="page hidden">
+  <div class="top pipeline-top">
+    <div class="title">
+      <h1>LJ Sales · Pipeline Comercial</h1>
+      <p>Priorize leads reais, veja a próxima melhor ação e acompanhe cada oportunidade da descoberta ao fechamento.</p>
+    </div>
+    <div class="top-actions">
+      <button class="secondary" onclick="refreshPipelineNow()">Atualizar agora</button>
+      <button class="secondary" onclick="prepareSalesActionQueue()">Preparar fila</button>
+      <button class="secondary" onclick="go('action-center')">Central de Ação</button>
+    </div>
+  </div>
+
+  <div class="pipeline-kpis">
+    <div class="card pipeline-kpi"><span>Em aberto</span><strong id="pipeOpen">0</strong><small>leads no ciclo comercial</small></div>
+    <div class="card pipeline-kpi"><span>Aguardando contato</span><strong id="pipeToContact">0</strong><small>Novo + Validado</small></div>
+    <div class="card pipeline-kpi"><span>Em negociação</span><strong id="pipeNegotiating">0</strong><small>Proposta + Negociação</small></div>
+    <div class="card pipeline-kpi"><span>Prioridade alta</span><strong id="pipeHighPriority">0</strong><small>score comercial ≥ 80</small></div>
+    <div class="card pipeline-kpi pipeline-kpi-win"><span>Ganhos</span><strong id="pipeWon">0</strong><small>fechamentos registrados</small></div>
+  </div>
+
+  <div class="pipeline-notice">
+    <div><strong>Etapa comercial ≠ status do Radar.</strong><span>O status comercial só muda quando alguém da equipe registra a movimentação. O sistema não inventa avanço de funil.</span></div>
+    <span id="pipelineUpdatedAt">Aguardando sincronização...</span>
+  </div>
+
+  <div class="toolbar pipeline-toolbar">
+    <input id="pipelineSearch" placeholder="Buscar lead, imóvel, cidade ou origem..." oninput="renderPipeline()">
+    <select id="pipelineTypeFilter" onchange="renderPipeline()">
+      <option value="">Todos os tipos</option>
+      <option value="opportunity">Proprietários / imóveis</option>
+      <option value="buyer_intent">Intenções captadas</option>
+      <option value="buyer">Compradores cadastrados</option>
+    </select>
+    <select id="pipelineOwnerFilter" onchange="renderPipeline()">
+      <option value="">Toda a equipe</option>
+      <option value="mine">Meus leads</option>
+      <option value="unassigned">Sem responsável</option>
+    </select>
+    <select id="pipelinePriorityFilter" onchange="renderPipeline()">
+      <option value="">Todas as prioridades</option>
+      <option value="high">Alta · 80+</option>
+      <option value="medium">Média · 60–79</option>
+      <option value="low">Baixa · até 59</option>
+    </select>
+    <select id="pipelineStageFilter" onchange="renderPipeline()">
+      <option value="">Todas as etapas</option>
+      <option value="new">Novo</option>
+      <option value="validated">Validado</option>
+      <option value="contacted">Contatado</option>
+      <option value="replied">Respondeu</option>
+      <option value="qualified">Qualificado</option>
+      <option value="visit_scheduled">Visita agendada</option>
+      <option value="visit_done">Visita realizada</option>
+      <option value="proposal">Proposta</option>
+      <option value="negotiation">Negociação</option>
+      <option value="won">Ganho</option>
+      <option value="lost">Perdido</option>
+    </select>
+  </div>
+
+  <div class="card sales-agent-card">
+    <div class="section-head"><div><h2>Agente Comercial</h2><span class="small">Lê contexto + memória do Lead 360° e prepara uma abordagem individual. Aprovação humana obrigatória.</span></div><span id="salesAgentMode" class="badge good">Contextual</span></div>
+    <div class="sales-agent-controls">
+      <select id="salesAgentLead" onchange="renderSalesAgentContext()"><option value="">Selecione um lead real...</option></select>
+      <select id="salesAgentGoal">
+        <option value="next">Próxima melhor ação</option><option value="reengage">Retomar conversa</option><option value="qualify">Qualificar necessidade</option><option value="visit">Agendar visita</option><option value="proposal">Avançar proposta</option><option value="objection">Tratar objeção</option>
+      </select>
+      <button class="primary" onclick="generateSalesAgentDraft()">Gerar com IA</button>
+    </div>
+    <div id="salesAgentContext" class="sales-agent-context"><div class="empty">Selecione um lead para o agente analisar o histórico comercial real.</div></div>
+    <div id="salesAgentResult" class="sales-agent-result hidden">
+      <div class="sales-agent-result-head"><strong>Abordagem preparada</strong><span id="salesAgentConfidence"></span></div>
+      <textarea id="salesAgentDraft" maxlength="2200"></textarea>
+      <div class="sales-agent-actions"><button class="primary" onclick="copySalesAgentDraft()">Copiar mensagem</button><button class="secondary" onclick="saveSalesAgentDraft()">Salvar na memória</button><button class="secondary" onclick="queueSalesAgentDraft()">Enviar para fila</button></div>
+      <small>A IA roda no backend: nenhuma chave Claude fica exposta no navegador. Se a função server-side estiver indisponível, o sistema usa o motor contextual local e informa o fallback. O envio continua exigindo aprovação humana.</small>
+    </div>
+  </div>
+
+  <div class="card sales-queue-card">
+    <div class="section-head"><div><h2>Fila de execução comercial</h2><span class="small">Follow-ups preparados pela inteligência. Nada é enviado sem aprovação humana.</span></div><span id="salesQueueCount" class="badge good">0</span></div>
+    <div class="sales-queue-controls"><label>Horário permitido <input id="salesQueueStart" type="time" value="09:00" onchange="saveSalesQueueHours()"></label><label>até <input id="salesQueueEnd" type="time" value="19:00" onchange="saveSalesQueueHours()"></label><button class="secondary" onclick="prepareSalesActionQueue()">Atualizar fila</button></div>
+    <div id="salesActionQueue" class="sales-action-queue"><div class="empty">Aguardando preparação da fila.</div></div>
+    <div class="sales-queue-foot">Integração WhatsApp oficial ainda não envia mensagens nesta versão. A fila prepara, aprova e registra ações com rastreabilidade.</div>
+  </div>
+
+  <div class="pipeline-board-wrap">
+    <div id="pipelineBoard" class="pipeline-board"><div class="empty">Carregando inteligência comercial...</div></div>
+  </div>
+</section>
+
+
+<section id="sales-inbox" class="page hidden">
+  <div class="top"><div><h1>Inbox Comercial</h1><p>Conversas reais registradas pelo canal oficial. Respostas assistidas por IA continuam sob aprovação humana.</p></div><div class="top-actions"><button class="secondary" onclick="refreshSalesInbox()">Atualizar</button><button class="secondary" onclick="go('pipeline')">Pipeline</button></div></div>
+  <div class="pipeline-kpis">
+    <div class="card pipeline-kpi"><span>Conversas</span><strong id="inboxThreads">0</strong><small>com histórico registrado</small></div>
+    <div class="card pipeline-kpi"><span>Não lidas</span><strong id="inboxUnread">0</strong><small>mensagens recebidas</small></div>
+    <div class="card pipeline-kpi"><span>Aguardando aprovação</span><strong id="inboxPending">0</strong><small>ações da fila comercial</small></div>
+    <div class="card pipeline-kpi"><span>Canal</span><strong id="inboxChannel">—</strong><small>WhatsApp Cloud API</small></div>
+  </div>
+  <div class="pipeline-notice"><div><strong>Sem simulação.</strong><span>Esta tela só mostra mensagens registradas no backend. Se o webhook oficial ainda não estiver configurado, permanece vazia.</span></div><span id="inboxUpdatedAt">Aguardando sincronização...</span></div>
+  <div class="toolbar pipeline-toolbar"><input id="inboxSearch" placeholder="Buscar nome, telefone ou conteúdo..." oninput="renderSalesInbox()"><select id="inboxDirection" onchange="renderSalesInbox()"><option value="">Recebidas e enviadas</option><option value="inbound">Recebidas</option><option value="outbound">Enviadas</option></select></div>
+  <div class="sales-inbox-layout"><div class="card"><div class="section-head"><div><h2>Conversas</h2><span class="small">Mais recentes primeiro</span></div></div><div id="salesInboxThreads" class="sales-inbox-threads"><div class="empty">Nenhuma conversa registrada.</div></div></div><div class="card"><div class="section-head"><div><h2>Conversa</h2><span id="salesInboxSelected" class="small">Selecione um contato</span></div></div><div id="salesInboxIntelligence" class="sales-inbox-intelligence"><div class="empty">Selecione uma conversa para identificar o lead e ler os sinais comerciais.</div></div><div id="salesInboxMessages" class="sales-inbox-messages"><div class="empty">Selecione uma conversa.</div></div><div id="salesInboxComposer" class="sales-inbox-composer hidden"><div class="sales-inbox-linkbar"><select id="salesInboxLeadLink"><option value="">Vincular a um lead real...</option></select><button class="secondary" onclick="manualLinkInboxLead()">Vincular</button><button class="secondary" onclick="analyzeSalesInboxThread()">Analisar com IA</button><button class="secondary" onclick="runSalesConversationMatch()">Extrair busca + Match</button></div><textarea id="salesInboxDraft" maxlength="2200" placeholder="Resposta aprovada para envio..."></textarea><div><button class="secondary" onclick="draftInboxWithAgent()">Preparar com Agente IA</button><button class="primary" onclick="sendApprovedWhatsApp()">Enviar WhatsApp</button></div><small>O Inbox vincula mensagens reais ao Lead 360°. Claude pode classificar intenção, objeção e próxima ação; o Match Comercial extrai somente critérios explícitos da conversa e cruza com imóveis reais. Qualquer envio continua exigindo aprovação humana.</small></div></div></div>
+</section>
+
+<section id="deep-search" class="page hidden">
+  <div class="strict-contact-banner">
+    <span>✓ Contato externo: validação rígida</span>
+    <strong>OLX só recebe WhatsApp quando o número público puder ser ligado ao mesmo anúncio com alta confiança.</strong>
+  </div>
+  <div class="collector-v2-live" id="collectorServerBanner"><span class="collector-live-dot"></span><div><strong id="collectorServerStatus">Coletor servidor V2</strong><small id="collectorServerMeta">Verificando a última execução real...</small></div><span class="collector-frequency">Coletor 4h · tela 2 min</span></div>
+  <div class="top">
+    <div class="title"><h1>Captação de proprietários</h1><p><span class="module-alias">Busca Profunda</span> encontra anúncios públicos e organiza novos proprietários para a equipe comercial.</p></div>
+    <div class="source-policy-mini"><b>Prioridade:</b> Facebook público e Marketplace com contato → web aberta → OLX secundária · Proprietário Direto fora da coleta ativa.</div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="window.LJI_BACKEND?.syncDiscovery?.()">Atualizar</button><button class="secondary" onclick="exportDiscoveryExcel()">Excel</button><button class="secondary" onclick="exportDiscoveryPdf()">PDF</button><button class="primary" onclick="go('imports')">Importar Excel</button></div>
+  </div>
+  <div class="manual-capture" id="manualCaptureDeep">
+    <div class="manual-capture-head">
+      <strong>Capturar lead de um link</strong>
+      <span>Facebook · Instagram · OLX · Threads · X · Telegram · TikTok · YouTube · web aberta</span>
+    </div>
+    <div class="manual-capture-row">
+      <input id="manualCaptureUrlDeep" type="url" inputmode="url" placeholder="Cole aqui o link do post ou anúncio..."
+             onkeydown="if(event.key==='Enter')runManualCapture('Deep')">
+      <select id="manualCaptureCityDeep" title="Deixe em automático; só escolha se o sistema não identificar a cidade">
+        <option value="">Cidade: detectar</option>
+        <option value="São Caetano do Sul">São Caetano do Sul</option>
+        <option value="Santo André">Santo André</option>
+        <option value="São Bernardo do Campo">São Bernardo do Campo</option>
+        <option value="Diadema">Diadema</option>
+        <option value="Mauá">Mauá</option>
+        <option value="Ribeirão Pires">Ribeirão Pires</option>
+        <option value="São Paulo">São Paulo</option>
+      </select>
+      <button class="primary" id="manualCaptureBtnDeep" onclick="runManualCapture('Deep')">Capturar</button>
+    </div>
+    <div class="manual-capture-result" id="manualCaptureResultDeep" hidden></div>
+  </div>
+  <div class="deep-purpose-card">
+    <div class="deep-purpose-copy">
+      <span class="module-kicker">O que se faz aqui</span>
+      <h2>Buscar novos proprietários antes de iniciar o atendimento</h2>
+      <p>Escolha a cidade, a modalidade e o tipo de imóvel. O Radar procura sinais em fontes públicas, elimina profissionais, regiões de risco e registros sem qualidade e encaminha somente os aprovados para <b>Proprietários</b> e <b>Leads com WhatsApp</b>.</p>
+    </div>
+    <div class="deep-purpose-steps" aria-label="Etapas da captação">
+      <div><b>1</b><span><strong>Buscar</strong><small>fontes públicas</small></span></div>
+      <div><b>2</b><span><strong>Validar</strong><small>qualidade e contato</small></span></div>
+      <div><b>3</b><span><strong>Encaminhar</strong><small>para atendimento</small></span></div>
+    </div>
+  </div>
+  <div class="notice search-scope-note"><strong>Contato:</strong> o Radar registra telefone/WhatsApp somente quando o próprio anúncio ou fonte pública o disponibiliza. Quando a plataforma esconde o número, o sistema mantém o canal oficial do anúncio para contato.</div>
+  <div class="contact-capture-panel">
+    <div class="contact-capture-copy">
+      <strong>Captação prioritária de proprietário com contato</strong>
+      <span>Facebook grupos públicos → Marketplace → web aberta → OLX secundária. Corretores, imobiliárias, CRECI e áreas de risco são descartados antes de entrar na lista.</span>
+    </div>
+    <div class="contact-capture-controls">
+      <input id="contactCaptureCity" list="ljiCityOptions" placeholder="Cidade" value="Santo André">
+      <input id="contactCaptureState" maxlength="2" placeholder="UF" value="SP">
+      <select id="contactCaptureTx"><option value="sale">Venda</option><option value="rent">Locação</option></select>
+      <select id="contactCaptureType"><option value="">Residencial</option><option>Apartamento</option><option>Casa</option><option>Studio</option><option>Kitnet</option><option>Cobertura</option></select>
+      <button id="contactCaptureBtn" class="primary" onclick="runContactCapture()">Captar com contato</button>
+    </div>
+    <div id="contactCaptureStatus" class="contact-capture-status">Pronto para buscar sinais públicos reais.</div>
+  </div>
+  <div id="sourceCoverage" class="source-coverage"></div>
+  <div class="toolbar deep-toolbar">
+    <input id="deepSearchInput" placeholder="Filtrar por imóvel, cidade, fonte ou contato..." oninput="renderDeepSearch()">
+    <select id="deepSourceFilter" onchange="renderDeepSearch()"><option value="">Todas as fontes</option></select>
+    <select id="deepCityFilter" onchange="renderDeepSearch()"><option value="">Todas as cidades</option></select>
+    <select id="deepOwnerFilter" onchange="renderDeepSearch()"><option value="">Todos</option><option value="direct">Proprietário direto</option></select>
+    <select id="deepContactFilter" onchange="renderDeepSearch()"><option value="">Todos os contatos</option><option value="whatsapp">Com WhatsApp</option><option value="phone">Com telefone</option><option value="hidden">Sem número público</option></select>
+  </div>
+  <div class="card">
+    <div class="section-head"><div><h2>Leads descobertos</h2><span class="small">Mais recentes primeiro · antes da aprovação para o pipeline</span></div><span id="deepCount" class="badge good">0</span></div>
+    <div id="deepSearchTable" class="empty">Carregando fontes...</div>
+  </div>
+</section>
+
+<section id="owners" class="page hidden">
+  <div class="top"><div class="title"><h1>Radar Proprietários</h1><p>Histórico permanente de imóveis residenciais elegíveis. Mais recentes primeiro.</p></div><div class="top-actions export-actions"><button class="secondary" onclick="exportOwnersExcel()">Excel</button><button class="secondary" onclick="exportOwnersPdf()">PDF</button><button class="primary" onclick="go('imports')">Importar Excel</button></div></div>
+  <div class="toolbar owners-toolbar"><input id="ownerSearch" placeholder="Buscar imóvel, cidade ou origem..." oninput="renderOwners()"><select id="ownerHistoryFilter" onchange="renderOwners()"><option value="">Todo o histórico</option><option value="current">Somente atuais</option><option value="archived">Somente históricos</option></select><select id="ownerCity" onchange="renderOwners()"><option value="">Todas as regiões</option></select></div>
+  <div class="card"><div id="ownersTable"></div></div>
+</section>
+
+<section id="registry" class="page hidden">
+  <div class="top registry-top">
+    <div class="title"><h1>Pesquisa Registral</h1><p>Digite o endereço ou o CEP e faça a busca diretamente no LJ Radar.</p></div>
+    <div class="top-actions"><button class="secondary" onclick="clearRegistryForm()">Nova busca</button></div>
+  </div>
+
+  <div class="registry-trust-banner">
+    <div><strong>Busca automática em um clique</strong><span>O Radar localiza e valida o endereço, completa CEP, cidade e UF e registra o resultado. O nome do titular só aparece como <b>Confirmado</b> quando existir evidência registral oficial.</span></div>
+    <span class="registry-official-badge">Sem resultado fictício</span>
+  </div>
+
+  <div class="registry-grid">
+    <div class="card registry-search-card">
+      <div class="section-head"><div><h2>Buscar imóvel</h2><span class="small">Informe o CEP ou preencha endereço, cidade e UF. Depois clique uma única vez em Buscar automaticamente.</span></div></div>
+      <div class="formgrid registry-formgrid">
+        <div class="registry-address registry-address-wrap"><label>Endereço completo</label><input id="rAddress" autocomplete="off" placeholder="Digite rua, número e complemento" oninput="onRegistryAddressInput()" onkeydown="onRegistryAddressKeydown(event)" onblur="scheduleHideRegistrySuggestions()"><div id="rAddressSuggestions" class="registry-address-suggestions hidden"></div></div>
+        <div><label>Cidade</label><input id="rCity" list="ljiCityOptions" autocomplete="address-level2" placeholder="Digite a cidade" oninput="onRegistryAddressInput()"></div>
+        <div><label>UF</label><input id="rState" maxlength="2" value="SP" autocomplete="address-level1" placeholder="SP" oninput="onRegistryAddressInput()"></div>
+        <div><label>CEP</label><input id="rCep" inputmode="numeric" autocomplete="postal-code" placeholder="Digite o CEP" onkeydown="if(event.key==='Enter'){event.preventDefault();runRegistrySearch()}"></div>
+        <div><label>Inscrição imobiliária / IPTU</label><input id="rMunicipalRegistration" placeholder="Se conhecida"></div>
+        <div><label>Matrícula</label><input id="rRegistryNumber" placeholder="Se conhecida"></div>
+        <div><label>Cartório de Registro de Imóveis</label><input id="rRegistryOffice" placeholder="Se conhecido"></div>
+        <div class="registry-notes"><label>Observações</label><input id="rNotes" placeholder="Complemento, condomínio, bloco, referência..."></div>
+      </div>
+      <div class="registry-actions-row">
+        <button id="registrySearchButton" class="primary registry-search-button" onclick="runRegistrySearch()">Buscar automaticamente</button>
+        <button class="secondary" onclick="clearRegistryForm()">Limpar</button>
+      </div>
+      <div id="registrySourceHint" class="registry-source-hint">A busca automática valida a localização com uma base pública de CEP. Nenhum proprietário será inventado quando a titularidade oficial não estiver disponível.</div>
+      <div id="registryLookupResult" class="registry-lookup-result hidden" aria-live="polite"></div>
+    </div>
+
+    <aside class="card registry-howto">
+      <div class="section-head"><h2>Como funciona</h2></div>
+      <ol>
+        <li><b>Digite:</b> use o CEP ou o endereço completo.</li>
+        <li><b>Busque:</b> o Radar completa e valida os dados automaticamente.</li>
+        <li><b>Resultado:</b> endereço, bairro, CEP, município e fonte aparecem na própria tela.</li>
+        <li><b>Titular:</b> só será confirmado quando houver matrícula, certidão ou referência oficial.</li>
+      </ol>
+      <div class="registry-source-stack">
+        <button onclick="openRiDigital()"><strong>Validação oficial, quando necessária</strong><span>RI Digital / ONR · matrícula e certidão</span></button>
+        <button onclick="openMunicipalRegistrySupport()"><strong>Apoio cadastral municipal</strong><span>IPTU / inscrição · não confirma proprietário</span></button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="card registry-results-card">
+    <div class="section-head"><h2>Consulta de CNPJ (grátis)</h2><span class="small">Quando o imóvel está em nome de empresa/incorporadora — dado público da Receita Federal, sem custo.</span></div>
+    <div class="registry-actions-row">
+      <input id="rCnpjLookupInput" inputmode="numeric" placeholder="Digite o CNPJ (só números)" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupCnpj()}">
+      <button class="primary" onclick="lookupCnpj()">Consultar CNPJ</button>
+    </div>
+    <div id="rCnpjLookupResult" class="registry-lookup-result hidden" aria-live="polite"></div>
+  </div>
+
+  <div class="card registry-results-card">
+    <div class="section-head"><div><h2>Pesquisas registradas</h2><span class="small">Histórico do workspace. Mais recentes primeiro.</span></div><span id="registryCount" class="badge good">0</span></div>
+    <div class="toolbar registry-toolbar"><input id="registrySearchFilter" placeholder="Buscar endereço, cidade, matrícula ou titular..." oninput="renderRegistrySearches()"><select id="registryStatusFilter" onchange="renderRegistrySearches()"><option value="">Todos os status</option><option value="draft">Endereço localizado / rascunho</option><option value="registry_identified">Cartório identificado</option><option value="certificate_requested">Certidão solicitada</option><option value="confirmed">Titular confirmado</option><option value="review">Revisar</option><option value="not_found">Não localizado</option></select></div>
+    <div id="registrySearchesTable" class="empty">Carregando pesquisas...</div>
+  </div>
+</section>
+
+
+<section id="whatsapp-leads" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Leads e WhatsApp</h1><p>Leads ativos com celular ficam prontos para contato. Contatos antigos permanecem no histórico, identificados pelo motivo de descarte ou inativação, sem voltar para a operação ativa.</p></div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="verifyOpenLeadsNow()">Verificar QuintoAndar</button><button class="secondary" onclick="exportWhatsAppExcel()">Excel</button><button class="secondary" onclick="exportWhatsAppPdf()">PDF</button></div>
+  </div>
+  <div class="manual-capture" id="manualCaptureWa">
+    <div class="manual-capture-head">
+      <strong>Capturar lead de um link</strong>
+      <span>Facebook · Instagram · OLX · Threads · X · Telegram · TikTok · YouTube · web aberta</span>
+    </div>
+    <div class="manual-capture-row">
+      <input id="manualCaptureUrlWa" type="url" inputmode="url" placeholder="Cole aqui o link do post ou anúncio..."
+             onkeydown="if(event.key==='Enter')runManualCapture('Wa')">
+      <select id="manualCaptureCityWa" title="Deixe em automático; só escolha se o sistema não identificar a cidade">
+        <option value="">Cidade: detectar</option>
+        <option value="São Caetano do Sul">São Caetano do Sul</option>
+        <option value="Santo André">Santo André</option>
+        <option value="São Bernardo do Campo">São Bernardo do Campo</option>
+        <option value="Diadema">Diadema</option>
+        <option value="Mauá">Mauá</option>
+        <option value="Ribeirão Pires">Ribeirão Pires</option>
+        <option value="São Paulo">São Paulo</option>
+      </select>
+      <button class="primary" id="manualCaptureBtnWa" onclick="runManualCapture('Wa')">Capturar</button>
+    </div>
+    <div class="manual-capture-result" id="manualCaptureResultWa" hidden></div>
+  </div>
+  <div class="grid4 whatsapp-kpis">
+    <div class="card"><div class="metric-label">Prontos para contato</div><div class="metric-value" id="waTotal">0</div><div class="metric-sub">números reais</div></div>
+    <div class="card"><div class="metric-label">Proprietários</div><div class="metric-value" id="waOwners">0</div><div class="metric-sub">oferta de imóvel</div></div>
+    <div class="card"><div class="metric-label">Intenções</div><div class="metric-value" id="waIntentions">0</div><div class="metric-sub">comprar / alugar / vender</div></div>
+    <div class="card"><div class="metric-label">Fora do QuintoAndar</div><div class="metric-value" id="waOutsideQa">0</div><div class="metric-sub">ofertas verificadas</div></div>
+  </div>
+  <div class="notice" style="margin-bottom:14px"><strong>Regra:</strong> “Pronto para contato” conta somente lead <b>ativo</b> com celular compatível com WhatsApp. O histórico não é apagado: contatos antigos continuam visíveis e exportáveis, mas separados da operação ativa. <span style="margin-left:8px"><b>Histórico com contato:</b> <span id="waHistoricalCount">0</span> · <b>Intenções carregadas:</b> <span id="waIntentLoaded">0</span> · <b>com telefone:</b> <span id="waIntentPhoneCount">0</span></span></div>
+  <div class="toolbar whatsapp-toolbar">
+    <input id="waSearch" placeholder="Buscar nome, imóvel, região ou origem..." oninput="renderWhatsAppLeads()">
+    <select id="waModuleFilter" onchange="renderWhatsAppLeads()"><option value="">Todos os módulos</option><option>Proprietários</option><option value="Busca Profunda">Captação de proprietários</option><option>Radar de Intenção</option><option value="Compradores">Demandas de compradores</option><option>Empresas</option></select>
+    <select id="waLeadStatusFilter" onchange="renderWhatsAppLeads()"><option value="">Ativos + histórico</option><option value="active">Somente ativos</option><option value="historical">Somente histórico/descartados</option></select>
+    <select id="waContactFilter" onchange="renderWhatsAppLeads()"><option value="">Todos os contatos</option><option value="whatsapp">Com WhatsApp</option><option value="phone">Somente telefone</option><option value="missing">Sem contato · revisar</option></select>
+    <select id="waQaFilter" onchange="renderWhatsAppLeads()"><option value="">Todos os status QuintoAndar</option><option value="no_public_match_found">Fora do QuintoAndar</option><option value="found_on_quintoandar">Já está no QuintoAndar</option><option value="inconclusive">Verificação inconclusiva</option><option value="pending">Aguardando checagem</option><option value="not_applicable">Não se aplica (procura)</option></select>
+    <select id="waSortFilter" onchange="renderWhatsAppLeads()"><option value="recent">Mais recentes primeiro</option><option value="relevant">Mais relevantes primeiro</option></select>
+  </div>
+  <div class="card"><div id="whatsappLeadsTable"></div></div>
+</section>
+
+
+
+<section id="contact-check" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Verificação de Contato</h1><p>Consolida ocorrências já capturadas e indica o telefone/WhatsApp mais confiável. Não inventa contato e não consulta bases privadas.</p></div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="exportContactCheckExcel()">Excel</button><button class="secondary" onclick="exportContactCheckPdf()">PDF</button></div>
+  </div>
+  <div class="grid4">
+    <div class="card"><div class="metric-label">Grupos cruzados</div><div class="metric-value" id="ccTotal">0</div><div class="metric-sub">ocorrências relacionadas</div></div>
+    <div class="card"><div class="metric-label">Confirmados</div><div class="metric-value" id="ccConfirmados">0</div><div class="metric-sub">mesmo contato em fontes</div></div>
+    <div class="card"><div class="metric-label">Em conflito</div><div class="metric-value" id="ccConflitos">0</div><div class="metric-sub">requer revisão</div></div>
+    <div class="card">
+      <div class="metric-label">Validar CEP (ViaCEP)</div>
+      <input id="cepLookupInput" placeholder="00000-000" style="margin-top:6px;width:100%">
+      <button class="secondary" style="margin-top:6px" onclick="lookupCep()">Consultar</button>
+      <div id="cepLookupResult" class="small" style="margin-top:6px"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="toolbar">
+      <input id="contactCheckSearch" placeholder="Buscar nome, bairro, endereço ou telefone..." oninput="renderContactCheck()">
+      <select id="contactCheckStatus" onchange="renderContactCheck()">
+        <option value="">Todos os status</option>
+        <option value="verificado_manual">Confirmados manualmente</option>
+        <option value="confirmado">Confirmados por fontes</option>
+        <option value="conflito">Somente conflitos</option>
+        <option value="unico">Somente registro único</option>
+        <option value="sem_contato">Sem contato</option>
+      </select>
+    </div>
+  </div>
+  <div id="contactCheckTable"></div>
+</section>
+
+<section id="discarded" class="page hidden">
+  <div class="top">
+    <div class="title">
+      <h1>Descartados / não aprovados</h1>
+      <p>Registros reais que não entraram no pipeline. O link original é preservado para conferência.</p>
+    </div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="exportDiscardedExcel()">Excel</button><button class="secondary" onclick="exportDiscardedPdf()">PDF</button><button class="secondary" onclick="window.LJI_BACKEND?.syncDiscarded?.()">Atualizar</button></div>
+  </div>
+
+  <div class="grid4 discarded-kpis">
+    <div class="card"><div class="metric-label">Total</div><div class="metric-value" id="dTotal">0</div><div class="metric-sub">fora do pipeline</div></div>
+    <div class="card"><div class="metric-label">Descartados na coleta</div><div class="metric-value" id="dRejected">0</div><div class="metric-sub">rejeitados no pré-filtro</div></div>
+    <div class="card"><div class="metric-label">Não aprovados</div><div class="metric-value" id="dNotApproved">0</div><div class="metric-sub">após verificação</div></div>
+    <div class="card"><div class="metric-label">Com link original</div><div class="metric-value" id="dWithLink">0</div><div class="metric-sub">acesso direto à fonte</div></div>
+  </div>
+
+  <div class="toolbar discarded-toolbar">
+    <input id="discardedSearch" placeholder="Buscar imóvel, cidade, fonte ou motivo..." oninput="renderDiscarded()">
+    <select id="discardedCategory" onchange="renderDiscarded()">
+      <option value="">Todos</option>
+      <option value="Descartado na coleta">Descartados na coleta</option>
+      <option value="Não aprovado após verificação">Não aprovados após verificação</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="section-head">
+      <h2>Registros para conferência</h2>
+      <span class="small">Nenhum registro é recriado ou simulado</span>
+    </div>
+    <div id="discardedTable" class="empty">Carregando registros reais...</div>
+  </div>
+</section>
+
+<section id="buyers" class="page hidden">
+  <div class="top"><div class="title"><h1>Demandas de compradores</h1><p>Registre o que uma pessoa realmente procura para o Match Engine localizar imóveis compatíveis.</p></div><div class="top-actions export-actions"><button class="secondary" onclick="exportBuyersExcel()">Excel</button><button class="secondary" onclick="exportBuyersPdf()">PDF</button></div></div>
+  <div class="buyer-purpose-card">
+    <div><span class="module-kicker">Para que serve</span><h2>Transformar o pedido de um comprador em busca automática</h2><p>Cadastre cidade, bairro, tipo, modalidade, orçamento e requisitos do cliente. Ao salvar, a demanda entra no <b>Match Engine unificado</b> junto das intenções públicas e é cruzada com as oportunidades reais da base.</p></div>
+    <button class="secondary" type="button" onclick="go('matches')">Abrir Match Engine →</button>
+  </div>
+  <div class="buyer-kpis">
+    <div class="card"><div class="metric-label">Demandas cadastradas</div><div class="metric-value" id="bTotal">0</div><div class="metric-sub">compradores no histórico</div></div>
+    <div class="card"><div class="metric-label">Com contato</div><div class="metric-value" id="bWithContact">0</div><div class="metric-sub">telefone, perfil ou link informado</div></div>
+    <div class="card"><div class="metric-label">Com imóvel compatível</div><div class="metric-value" id="bMatched">0</div><div class="metric-sub">demandas com match atual</div></div>
+  </div>
+  <div class="card">
+    <div class="formgrid">
+      <div><label>Nome / identificação</label><input id="bName" placeholder="Ex.: Carlos — Instagram"></div>
+      <div><label>Cidade / região</label><input id="bCity" list="ljiCityOptions" placeholder="Ex.: São Paulo — Centro" oninput="refreshBuyerNeighborhoodOptions()" onchange="refreshBuyerNeighborhoodOptions()"><datalist id="ljiCityOptions"></datalist></div>
+      <div><label>Bairro desejado (opcional)</label><input id="bNeighborhood" list="ljiBuyerNeighborhoodOptions" placeholder="Ex.: República, Bela Vista, Moema, Centro..."><datalist id="ljiBuyerNeighborhoodOptions"></datalist><div class="small" style="margin-top:5px">Você pode deixar vazio para buscar a região inteira ou informar um bairro para deixar o Match Engine mais preciso.</div></div>
+      <div><label>Tipo</label><select id="bType"><option>Apartamento</option><option>Casa</option><option>Studio</option><option>Kitnet</option><option>Cobertura</option></select></div>
+      <div><label>Modalidade</label><select id="bTransactionType"><option value="sale">Compra</option><option value="rent">Locação</option><option value="both">Compra e locação</option></select></div>
+      <div><label>Orçamento máximo</label><input id="bBudget" type="number" placeholder="800000"></div>
+      <div><label>Quartos mínimos</label><input id="bBeds" type="number" value="2" min="0"></div>
+      <div><label>Vagas mínimas</label><input id="bParking" type="number" value="1" min="0"></div>
+      <div><label>Área mínima (m²)</label><input id="bArea" type="number" value="0" min="0" placeholder="Ex.: 80"></div>
+      <div><label>Urgência</label><select id="bUrgency"><option value="3">Alta</option><option value="2">Média</option><option value="1">Baixa</option></select></div>
+      <div><label>Origem</label><select id="bSource"><option>Facebook</option><option>Instagram</option><option>WhatsApp</option><option>OLX</option><option>Indicação</option><option>Outro</option></select></div>
+      <div><label>Contato</label><input id="bContact" placeholder="@, telefone ou link"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="addBuyer()">Salvar e cruzar</button></div>
+  </div>
+  <div class="card" style="margin-top:18px"><div id="buyersTable"></div></div>
+</section>
+
+
+<section id="intentions" class="page hidden">
+  <div class="top">
+    <div class="title">
+      <h1>Radar de Intenção</h1>
+      <p>Sinais reais de quem procura imóvel e de proprietários que querem vender ou alugar o próprio imóvel.</p>
+    </div>
+    <div class="top-actions export-actions">
+      <button class="secondary" onclick="exportIntentionsExcel()">Excel</button>
+      <button class="secondary" onclick="exportIntentionsPdf()">PDF</button>
+      <button class="secondary" onclick="syncIntentions()">Atualizar</button>
+      <button class="primary" id="intentRunBtn" onclick="runIntentPipeline()">Rodar Radar completo</button>
+    </div>
+  </div>
+  <div class="notice" id="intentProductionBanner" style="margin-bottom:18px">
+    <strong>Produção real.</strong> Esta tela não cria exemplos. Sem resultado no Supabase = tela vazia.
+  </div>
+
+  <div class="grid4 intent-kpis">
+    <button class="card intent-kpi-link" type="button" onclick="setIntentStatus('active')"><div class="metric-label">Ativas</div><div class="metric-value" id="iTotal">0</div><div class="metric-sub">oportunidades para trabalhar</div><span>Abrir →</span></button>
+    <button class="card intent-kpi-link" type="button" onclick="setIntentRoleFilter('seller')"><div class="metric-label">Proprietários</div><div class="metric-value" id="iHot">0</div><div class="metric-sub">querem vender / alugar</div><span>Ver →</span></button>
+    <button class="card intent-kpi-link" type="button" onclick="setIntentContactFilter()"><div class="metric-label">Contato público</div><div class="metric-value" id="iEnriched">0</div><div class="metric-sub">telefone/WhatsApp encontrado</div><span>Filtrar →</span></button>
+    <button class="card intent-kpi-link" type="button" onclick="document.getElementById('intentMatchesTable')?.scrollIntoView({behavior:'smooth'})"><div class="metric-label">Matches</div><div class="metric-value" id="iMatches">0</div><div class="metric-sub">compatibilidades validadas</div><span>Ver →</span></button>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-head">
+      <h2>Nova busca</h2>
+      <span class="badge good">Busca real · fonte pública</span>
+    </div>
+    <div class="formgrid">
+      <div>
+        <label>Região</label>
+        <select id="iRegion" onchange="refreshIntentNeighborhoodOptions()">
+          <optgroup label="Grande ABC">
+            <option>Santo André</option>
+            <option>São Bernardo do Campo</option>
+            <option>São Caetano do Sul</option>
+            <option>Diadema</option>
+          </optgroup>
+          <optgroup label="São Paulo">
+            <option>São Paulo — Centro</option>
+            <option>São Paulo — Zona Sul</option>
+            <option>São Paulo — Zona Leste</option>
+            <option>São Paulo — Zona Oeste</option>
+            <option>São Paulo — Zona Norte</option>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label>Bairro (opcional)</label>
+        <input id="iNeighborhood" list="ljiIntentNeighborhoodOptions" placeholder="Ex.: Bela Vista, República, Moema...">
+        <datalist id="ljiIntentNeighborhoodOptions"></datalist>
+        <div class="small" style="margin-top:5px">Se preenchido, o Radar faz a busca pública direcionada ao bairro.</div>
+      </div>
+      <div>
+        <label>Intenção</label>
+        <select id="iTransaction">
+          <optgroup label="Quem procura imóvel">
+            <option value="buyer:sale">Comprar imóvel</option>
+            <option value="buyer:rent">Alugar imóvel</option>
+          </optgroup>
+          <optgroup label="Proprietário">
+            <option value="seller:sale">Quero vender meu imóvel</option>
+            <option value="seller:rent">Quero alugar meu imóvel</option>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select id="iType">
+          <option value="">Todos</option>
+          <option>Apartamento</option>
+          <option>Casa</option>
+          <option>Studio</option>
+          <option>Kitnet</option>
+        </select>
+      </div>
+      <div>
+        <label>Janela</label>
+        <select id="iDays">
+          <option value="3">Últimos 3 dias</option>
+          <option value="7">Últimos 7 dias</option>
+          <option value="21" selected>Últimas 3 semanas</option>
+          <option value="30">Últimos 30 dias</option>
+        </select>
+      </div>
+      <div class="full">
+        <label>Busca complementar</label>
+        <input id="iExtra" placeholder="Ex.: 3 dormitórios, metrô, financiamento">
+      </div>
+    </div>
+    <div id="intentCollectorStatus" class="notice" style="margin-top:14px">Aguardando coleta real.</div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-head"><h2>Intenções encontradas</h2><button class="secondary" onclick="syncIntentions()">Atualizar</button></div>
+    <div class="toolbar intent-toolbar">
+      <input id="intentSearch" placeholder="Buscar pessoa, região ou tipo..." oninput="renderIntentions()">
+      <select id="intentStatusFilter" onchange="renderIntentions()">
+        <option value="active" selected>Somente ativas</option>
+        <option value="">Todo o histórico</option>
+        <option value="history">Somente histórico</option>
+      </select>
+      <select id="intentRoleFilter" onchange="renderIntentions()">
+        <option value="">Compradores + proprietários</option>
+        <option value="buyer">Quem procura imóvel</option>
+        <option value="seller">Proprietários querendo vender/alugar</option>
+      </select>
+      <select id="intentRegionFilter" onchange="renderIntentions()"><option value="">Todas as regiões</option></select>
+      <select id="intentMinScore" onchange="renderIntentions()">
+        <option value="0">Todos os scores</option>
+        <option value="60">60+</option>
+        <option value="80">80+</option>
+      </select>
+      <input type="hidden" id="intentBudgetOnly" value="0">
+      <input type="hidden" id="intentContactOnly" value="0">
+    </div>
+    <div id="intentionsTable"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-head"><h2>Matches intenção ↔ imóvel</h2></div>
+    <div id="intentMatchesTable"></div>
+  </div>
+</section>
+
+<section id="matches" class="page hidden">
+  <div class="top"><div class="title"><h1>Match Engine</h1><p>Match unificado: cruza intenções públicas reais e demandas cadastradas com os imóveis elegíveis da base.</p></div><div class="top-actions export-actions"><button class="secondary" onclick="exportMatchesExcel()">Excel</button><button class="secondary" onclick="exportMatchesPdf()">PDF</button><button class="primary" id="matchRefreshBtn" onclick="refreshMatchEngine()">Atualizar matches</button></div></div>
+  <div class="match-policy"><span>✓ Máximo 1 ano</span><strong>Anúncios e intenções com mais de 365 dias não entram nos matches atuais. Fontes com contato pago não entram no pipeline ativo. Um anúncio parecido não é tratado como o mesmo imóvel.</strong></div>
+  <div class="grid4"><div class="card"><div class="metric-label">Total</div><div class="metric-value" id="mtotal">0</div></div><div class="card"><div class="metric-label">Quentes</div><div class="metric-value" id="mhot">0</div></div><div class="card"><div class="metric-label">Altos</div><div class="metric-value" id="mhigh">0</div></div><div class="card"><div class="metric-label">Médios</div><div class="metric-value" id="mmid">0</div></div></div>
+  <div class="toolbar match-toolbar"><select id="matchSourceFilter" onchange="renderMatches()"><option value="">Todas as fontes</option></select><span class="small">A fonte aparece em cada intenção e em cada imóvel.</span></div>
+  <div class="card"><div id="matchesTable"></div></div>
+</section>
+
+<section id="imports" class="page hidden">
+  <div class="top"><div class="title"><h1>Importar leads</h1><p>Importe planilhas Excel reais para a fila de captação de proprietários e verificação.</p></div><button class="secondary" onclick="downloadExcelTemplate()">Baixar modelo Excel</button></div>
+  <div class="notice" style="margin-bottom:16px"><strong>Formato aceito:</strong> .xlsx ou .xls. Colunas reconhecidas: imóvel/título, cidade, bairro, endereço, CEP, tipo, modalidade, valor, área, quartos, vagas, fonte/origem, link, data de publicação, contato, telefone e WhatsApp.</div>
+  <div class="card excel-import-card">
+    <div class="section-head"><h2>Selecionar arquivo</h2><span class="badge mid">Excel</span></div>
+    <input id="excelFileInput" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onchange="previewExcelImport(this.files?.[0])">
+    <div id="excelImportSummary" class="small" style="margin-top:10px">Nenhum arquivo selecionado.</div>
+    <div id="excelImportPreview" class="excel-preview"></div>
+    <div class="import-actions"><button class="secondary" onclick="clearExcelImport()">Limpar</button><button id="excelImportBtn" class="primary" onclick="confirmExcelImport()" disabled>Importar para verificação</button></div>
+  </div>
+</section>
+
+
+<section id="trades" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Permutas</h1><p>Match bidirecional entre proprietários, oferta atual e imóvel desejado.</p></div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="exportTradesExcel()">Excel</button><button class="secondary" onclick="exportTradesPdf()">PDF</button><button class="primary" onclick="renderTrades();toast('Permutas recalculadas.')">Recalcular</button></div>
+  </div>
+
+  <div class="grid4">
+    <div class="card"><div class="metric-label">Interesses ativos</div><div class="metric-value" id="tIntents">0</div><div class="metric-sub">proprietários aceitando troca</div></div>
+    <div class="card"><div class="metric-label">Matches</div><div class="metric-value" id="tMatches">0</div><div class="metric-sub">compatibilidade ≥ 60%</div></div>
+    <div class="card"><div class="metric-label">Bidirecionais</div><div class="metric-value" id="tBi">0</div><div class="metric-sub">um busca o imóvel do outro</div></div>
+    <div class="card"><div class="metric-label">Quentes 🔥</div><div class="metric-value" id="tHot">0</div><div class="metric-sub">score ≥ 85%</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-head"><h2>Novo interesse de permuta</h2><span class="badge good">Match automático</span></div>
+    <div class="formgrid">
+      <div><label>Imóvel oferecido</label><select id="tOwner"></select></div>
+      <div><label>Cidade desejada</label><select id="tCity"><optgroup label="Grande ABC">
+<option>Santo André</option><option>São Bernardo do Campo</option><option>São Caetano do Sul</option><option>Diadema</option>
+</optgroup>
+<optgroup label="São Paulo">
+<option>São Paulo — Centro</option><option>São Paulo — Zona Sul</option><option>São Paulo — Zona Leste</option><option>São Paulo — Zona Oeste</option><option>São Paulo — Zona Norte</option>
+</optgroup></select></div>
+      <div><label>Bairro desejado (opcional)</label><input id="tNeighborhood" placeholder="Ex.: Liberdade"><span class="small">Bairro exato ou vizinho aumenta o score; longe demais, diminui.</span></div>
+      <div><label>Tipo desejado</label><select id="tType"><option>Apartamento</option><option>Casa</option><option>Studio</option><option>Kitnet</option><option>Terreno</option><option>Galpão</option></select></div>
+      <div><label>Valor máximo</label><input id="tBudget" type="number" placeholder="800000"></div>
+      <div><label>Quartos mínimos</label><input id="tBeds" type="number" min="0" value="2"></div>
+      <div><label>Vagas mínimas</label><input id="tParking" type="number" min="0" value="1"></div>
+      <div class="full"><label>Observações</label><textarea id="tNotes" rows="3" placeholder="Ex.: aceita diferença em dinheiro; preferência por andar alto"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="addTradeIntent()">Salvar e cruzar</button></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-head"><h2>Interesses cadastrados</h2></div>
+    <div id="tradeIntentsTable"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-head"><h2>Oportunidades de permuta</h2></div>
+    <div id="tradeMatchesTable"></div>
+  </div>
+</section>
+
+<section id="companies" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Empresas / Expansão</h1><p>Demandas corporativas, expansão territorial e imóveis compatíveis.</p></div>
+    <div class="top-actions export-actions"><button class="secondary" onclick="exportCompaniesExcel()">Excel</button><button class="secondary" onclick="exportCompaniesPdf()">PDF</button></div>
+  </div>
+
+  <div class="grid4">
+    <div class="card"><div class="metric-label">Demandas ativas</div><div class="metric-value" id="cTotal">0</div></div>
+    <div class="card"><div class="metric-label">Alta urgência</div><div class="metric-value" id="cUrgent">0</div></div>
+    <div class="card"><div class="metric-label">Potencial financeiro</div><div class="metric-value" id="cBudgetTotal">R$ 0</div></div>
+    <div class="card"><div class="metric-label">Matches corporativos</div><div class="metric-value" id="cMatches">0</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-head"><h2>Nova demanda corporativa</h2></div>
+    <div class="formgrid">
+      <div><label>Empresa / grupo</label><input id="cName" placeholder="Ex.: Grupo internacional"></div>
+      <div><label>Cidade / região</label><input id="cCity" placeholder="Ex.: Itaim Bibi / Paulista"></div>
+      <div><label>Tipo de imóvel</label><select id="cType"><option>Prédio comercial</option><option>Laje corporativa</option><option>Loja</option><option>Galpão</option><option>Terreno</option><option>Hotel</option></select></div>
+      <div><label>Orçamento máximo</label><input id="cBudget" type="number" placeholder="125000000"></div>
+      <div><label>Área mínima (m²)</label><input id="cArea" type="number" placeholder="1000"></div>
+      <div><label>Urgência</label><select id="cUrgency"><option value="3">Alta</option><option value="2">Média</option><option value="1">Baixa</option></select></div>
+      <div><label>Andares mínimos</label><input id="cFloors" type="number" min="0" placeholder="15"></div>
+      <div><label>Origem</label><select id="cSource"><option>Indicação</option><option>WhatsApp</option><option>LinkedIn</option><option>Parceiro</option><option>Inbound</option><option>Outro</option></select></div>
+      <div><label>Contato</label><input id="cContact" placeholder="Nome, telefone ou e-mail"></div>
+      <div class="full"><label>Critérios / observações</label><textarea id="cNotes" rows="3" placeholder="Ex.: prédio inteiro ou mínimo 3 andares, pronto para ocupação"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="addCompanyDemand()">Salvar demanda</button></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px"><div class="section-head"><h2>Pipeline corporativo</h2></div><div id="companiesTable"></div></div>
+  <div class="card"><div class="section-head"><h2>Imóveis compatíveis</h2></div><div id="companyMatchesTable"></div></div>
+</section>
+
+
+<section id="charts" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Gráficos da operação</h1><p>Evolução real do LJ Radar Imob desde 20/08/2026.</p></div>
+    <button class="primary" onclick="window.LJI_BACKEND?.syncMetrics?.()">Atualizar gráficos</button>
+  </div>
+
+  <div class="ops-kpis">
+    <div class="card ops-kpi-featured"><div class="metric-label">Histórico de leads com WhatsApp</div><div class="metric-value" id="gWhatsAppHistory">0</div><div class="metric-sub">ativos + históricos, sem duplicar</div></div>
+    <div class="card"><div class="metric-label">Resultados captados</div><div class="metric-value" id="gNewResults">0</div><div class="metric-sub">novos resultados do coletor</div></div>
+    <div class="card"><div class="metric-label">Intenções captadas</div><div class="metric-value" id="gIntentions">0</div><div class="metric-sub">desde 20/08</div></div>
+    <div class="card"><div class="metric-label">Oportunidades sincronizadas</div><div class="metric-value" id="gOpportunities">0</div><div class="metric-sub">imóveis inseridos na base</div></div>
+    <div class="card"><div class="metric-label">Coletas executadas</div><div class="metric-value" id="gRuns">0</div><div class="metric-sub">execuções registradas</div></div>
+    <div class="card"><div class="metric-label">Erros registrados</div><div class="metric-value" id="gErrors">0</div><div class="metric-sub">nas coletas do período</div></div>
+  </div>
+
+  <div class="ops-chart-grid">
+    <div class="card">
+      <div class="section-head"><div><h2>Captação diária</h2><span class="small">Intenções captadas × novos resultados encontrados</span></div></div>
+      <div id="captureOpsChart" class="ops-chart-empty">Carregando...</div>
+    </div>
+    <div class="card">
+      <div class="section-head"><div><h2>Pipeline diário</h2><span class="small">Oportunidades sincronizadas × coletas executadas</span></div></div>
+      <div id="pipelineOpsChart" class="ops-chart-empty">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="section-head"><div><h2>Operação dia a dia</h2><span class="small">Período iniciado em 20/08/2026</span></div></div>
+    <div id="opsDailyTable" class="empty">Carregando dados reais...</div>
+  </div>
+</section>
+
+<section id="reports" class="page hidden">
+  <div class="top">
+    <div class="title"><h1>Relatórios</h1><p>Conversão, VGV, origem, produtividade e potencial comercial.</p></div>
+    <div style="display:flex;gap:10px"><button class="secondary" onclick="exportReportCSV()">Exportar CSV</button><button class="primary" onclick="window.print()">Imprimir / PDF</button></div>
+  </div>
+
+  <div class="grid4">
+    <div class="card"><div class="metric-label">VGV em carteira</div><div class="metric-value" id="rVgv">R$ 0</div></div>
+    <div class="card"><div class="metric-label">Ticket médio</div><div class="metric-value" id="rTicket">R$ 0</div></div>
+    <div class="card"><div class="metric-label">Matches quentes</div><div class="metric-value" id="rHot">0</div></div>
+    <div class="card"><div class="metric-label">Comissão potencial</div><div class="metric-value" id="rCommission">R$ 0</div></div>
+  </div>
+
+  <div class="workspace" style="margin-bottom:18px">
+    <div class="card"><div class="section-head"><h2>Origem dos leads</h2></div><div id="rSources"></div></div>
+    <div class="card"><div class="section-head"><h2>Funil comercial</h2></div><div id="rFunnel"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="section-head"><h2>Resumo executivo</h2></div>
+    <div id="rExecutive"></div>
+  </div>
+</section>
+
+
+
+<section id="users-admin" class="page hidden">
+  <div class="top"><div class="title"><h1>Usuários e permissões</h1><p>Clique em um usuário para definir exatamente quais telas ele verá.</p></div><button class="secondary" onclick="window.LJI_BACKEND?.syncAdmin?.()">Atualizar</button></div>
+  <div class="notice" style="margin-bottom:16px"><strong>CEO:</strong> acesso total. Para Gestora e Corretora você pode liberar ou bloquear módulos individualmente.</div>
+  <div class="card"><div class="section-head"><h2>Equipe autorizada</h2><span class="badge good" id="adminUsersCount">0 usuários</span></div><div id="adminUsersBody" class="empty">Carregando usuários reais do Supabase...</div></div>
+  <div id="permissionEditor" class="permission-editor hidden"></div>
+</section>
+
+<section id="history" class="page hidden">
+  <div class="top">
+    <div class="title">
+      <h1>Histórico</h1>
+      <p>Coletas, atividades e eventos reais registrados no Supabase.</p>
+    </div>
+    <button class="secondary" onclick="window.LJI_BACKEND?.syncAdmin?.()">Atualizar histórico</button>
+  </div>
+
+  <div class="grid4 history-kpis">
+    <div class="card"><div class="metric-label">Coletas registradas</div><div class="metric-value" id="histRunsCount">0</div><div class="metric-sub">execuções do coletor</div></div>
+    <div class="card"><div class="metric-label">Novos resultados</div><div class="metric-value" id="histNewCount">0</div><div class="metric-sub">somatório das coletas</div></div>
+    <div class="card"><div class="metric-label">Erros</div><div class="metric-value" id="histErrorCount">0</div><div class="metric-sub">erros registrados</div></div>
+    <div class="card"><div class="metric-label">Atividades</div><div class="metric-value" id="histActivityCount">0</div><div class="metric-sub">ações registradas</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-head"><h2>Histórico de coletas</h2><span class="small">Dados reais · mais recentes primeiro</span></div>
+    <div id="collectorHistoryBody" class="empty">Carregando...</div>
+  </div>
+
+  <div class="workspace">
+    <div class="card">
+      <div class="section-head"><h2>Atividades do sistema</h2></div>
+      <div id="activityHistoryBody" class="empty">Nenhuma atividade registrada.</div>
+    </div>
+    <div class="card role-admin-only">
+      <div class="section-head"><h2>Auditoria de segurança</h2></div>
+      <div id="securityHistoryBody" class="empty">Nenhum evento registrado.</div>
+    </div>
+  </div>
+</section>
+
+<div id="settingsOverlay" class="settings-overlay" onclick="closeSettingsPanel()"></div>
+<section id="settings" class="settings-panel" onclick="event.stopPropagation()">
+  <div class="top"><div class="title"><h1>Configurações</h1><p>Conta, equipe, operação, integrações e aparência.</p></div><button class="settings-close" type="button" onclick="closeSettingsPanel()" aria-label="Fechar">✕</button></div>
+  <div class="notice" style="margin-bottom:16px"><strong>Fonte de verdade: Supabase.</strong> Preferências de usuário e dados operacionais são persistidos no backend. O navegador não mantém uma segunda base local de proprietários/compradores.</div>
+  <div class="settings-layout">
+    <div class="card settings-nav">
+      <button class="active" data-setting="appearance">Aparência</button>
+      <button data-setting="account">Conta</button>
+      <button data-setting="users">Usuários e permissões</button>
+      <button data-setting="commercial">Regras comerciais</button>
+      <button data-setting="coverage">Cidades e cobertura</button>
+      <button data-setting="integrations">Integrações</button>
+      <button data-setting="notifications">Notificações</button>
+      <button data-setting="security">Segurança</button>
+      <button data-setting="data">Dados e histórico</button>
+    </div>
+    <div>
+      <section id="appearance" class="setting-section active">
+        <div class="card">
+          <div class="section-head"><h2>Aparência</h2><span class="badge good">Padrão inicial: Champagne</span></div>
+          <div class="notice" style="margin-bottom:16px">O LJ Radar Imob inicia em <strong>Champagne</strong>. A preferência escolhida pode ser salva no seu usuário no Supabase.</div>
+          <div class="theme-grid">
+            <div class="theme" data-theme-card="champagne" onclick="applyTheme('champagne')"><div class="swatch" style="background:linear-gradient(135deg,#fffdf8,#e7d2aa)"></div><strong>Champagne</strong><div class="small">Padrão oficial</div></div>
+            <div class="theme" data-theme-card="emerald" onclick="applyTheme('emerald')"><div class="swatch" style="background:linear-gradient(135deg,#ffffff,#77cfae)"></div><strong>Esmeralda</strong></div>
+            <div class="theme" data-theme-card="dark" onclick="applyTheme('dark')"><div class="swatch" style="background:linear-gradient(135deg,#0f1216,#2a2e34)"></div><strong>Dark Mode</strong></div>
+            <div class="theme" data-theme-card="graphite" onclick="applyTheme('graphite')"><div class="swatch" style="background:linear-gradient(135deg,#f4f5f6,#9da4ac)"></div><strong>Grafite</strong></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px"><button class="secondary" onclick="applyTheme('champagne')">Restaurar Champagne</button><button class="primary" onclick="saveThemePreference()">Salvar preferência</button></div>
+        </div>
+      </section>
+
+      <section id="account" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Conta</h2><span class="badge good">Supabase</span></div>
+  <div class="field-grid">
+    <div><label>Nome</label><input id="accountName" value="" maxlength="100"></div>
+    <div><label>Cargo</label><input id="accountRole" value="" readonly></div>
+    <div><label>E-mail</label><input id="accountEmail" value="" readonly></div>
+    <div><label>Empresa</label><input value="LJ Radar Imob" readonly></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="saveAccountSettings()">Salvar nome</button></div>
+</div>
+</section>
+
+      <section id="users" class="setting-section role-admin-only">
+      <div class="card">
+        <div class="section-head"><h2>Usuários e permissões</h2><span class="badge good">CEO</span></div>
+        <p class="small">Gerencie os usuários reais do workspace e altere o nível de acesso.</p>
+        <div style="margin-top:14px"><button class="primary" onclick="go('users-admin')">Abrir Central de Usuários</button></div>
+      </div>
+    </section>
+
+      <section id="commercial" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Regras comerciais</h2></div>
+  <div class="field-grid">
+    <div><label>Venda mínima</label><input id="setMinSale" value="200000"></div>
+    <div><label>Locação mínima</label><input id="setMinRent" value="1000"></div>
+    <div><label>Comissão de venda (%)</label><input id="setSaleCommission" value="1.25"></div>
+    <div><label>Adicional estimado (%)</label><input id="setExtraFee" value="1.5"></div>
+  </div>
+  <div class="notice" style="margin-top:10px">A comissão de venda alimenta o KPI "Receita potencial estimada" no Dashboard.</div>
+  <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="saveCommercialRules()">Salvar regras</button></div>
+</div>
+</section>
+
+      <section id="coverage" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Cidades e cobertura</h2><span class="badge good">Regras independentes</span></div>
+  <div class="setting-row"><div><strong>Captação QuintoAndar</strong><span>Cobertura nacional nas cidades elegíveis configuradas no backend.</span></div><span class="badge good">Nacional elegível</span></div>
+  <div class="setting-row"><div><strong>Permutas e leads comerciais</strong><span>Grande ABC + zonas Sul, Leste, Oeste e Norte de São Paulo.</span></div><span class="badge good">Segmentado</span></div>
+  <div class="notice" style="margin-top:14px">São escopos diferentes por regra de negócio; a interface agora deixa essa separação explícita.</div>
+</div>
+</section>
+
+      <section id="integrations" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Integrações</h2><span class="small" id="integrationCheckedAt">Estado operacional</span></div>
+  <div class="setting-row"><div><strong>Supabase</strong><span>Banco de dados e autenticação</span></div><span id="integrationSupabase" class="badge mid">Verificando</span></div>
+  <div class="setting-row"><div><strong>Hospedagem</strong><span id="integrationHostingDetail">Ambiente atual da aplicação</span></div><span id="integrationHosting" class="badge mid">Detectando</span></div>
+  <div class="setting-row"><div><strong>Pesquisa e coleta</strong><span id="integrationSearchDetail">Estado baseado na última execução real do coletor</span></div><span id="integrationSearch" class="badge mid">Sem execução</span></div>
+  <div class="setting-row"><div><strong>Enriquecimento IA</strong><span>Processamento realizado no backend; credenciais não são expostas ao navegador</span></div><span id="integrationAi" class="badge mid">Não verificado</span></div>
+</div>
+</section>
+
+      <section id="notifications" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Alertas no painel</h2><span class="badge good">Preferência no Supabase</span></div>
+  <div class="notice" style="margin-bottom:12px">Estas opções persistem no seu usuário e controlam alertas internos do LJ Radar. Não são notificações push do celular.</div>
+  <div class="setting-row"><div><strong>Match quente</strong><span>Score ≥ 85%</span></div><div class="toggle" data-notification-key="hot_match" onclick="toggleNotificationPreference(this)"></div></div>
+  <div class="setting-row"><div><strong>Novo proprietário</strong><span>Lead aprovado</span></div><div class="toggle" data-notification-key="new_owner" onclick="toggleNotificationPreference(this)"></div></div>
+  <div class="setting-row"><div><strong>Nova permuta</strong><span>Novo match de troca</span></div><div class="toggle" data-notification-key="new_trade" onclick="toggleNotificationPreference(this)"></div></div>
+  <div class="setting-row"><div><strong>Falha no coletor</strong><span>Erro operacional</span></div><div class="toggle" data-notification-key="collector_failure" onclick="toggleNotificationPreference(this)"></div></div>
+</div>
+</section>
+
+      <section id="security" class="setting-section role-admin-only">
+<div class="card">
+  <div class="section-head"><h2>Segurança</h2><span class="badge good">Auditada</span></div>
+  <div class="setting-row"><div><strong>Autenticação em duas etapas</strong><span>Não há mais toggle visual sem efeito. MFA só será exibido quando o fluxo real estiver habilitado no Supabase Auth.</span></div><span class="badge mid">Não habilitado</span></div>
+  <div class="setting-row"><div><strong>Outras sessões</strong><span>Encerra sessões do mesmo usuário em outros dispositivos.</span></div><button class="secondary" onclick="signOutOtherSessions()">Encerrar outras sessões</button></div>
+  <div class="setting-row"><div><strong>Histórico de acessos</strong><span>Logins e mudanças críticas</span></div><button class="secondary" onclick="go('history')">Ver histórico</button></div>
+</div>
+</section>
+
+      <section id="data" class="setting-section">
+<div class="card">
+  <div class="section-head"><h2>Dados e histórico</h2><span class="badge good">Exportação real</span></div>
+  <div class="setting-row"><div><strong>Snapshot operacional</strong><span>Exporta os dados carregados do workspace em JSON, com data e versão.</span></div><button class="secondary" onclick="createWorkspaceBackup()">Exportar snapshot</button></div>
+  <div class="setting-row"><div><strong>Último snapshot</strong><span id="backupLastAt">Ainda não exportado</span></div><span class="badge mid">Arquivo local</span></div>
+  <div class="setting-row"><div><strong>Logs operacionais</strong><span>Importações, filtros e decisões</span></div><button class="secondary" onclick="go('history')">Abrir logs</button></div>
+</div>
+</section>
+    </div>
+  </div>
+</section>
+</main>
+</div>
+</div>
+
+<nav class="mobile-bottom-nav" aria-label="Navegação móvel">
+  <button type="button" class="mobile-nav-home" data-mobile-go="dashboard" onclick="mobileGo('dashboard')"><span>⌂</span><b>Dashboard</b></button>
+  <button type="button" class="mobile-wa" data-mobile-go="whatsapp-leads" onclick="mobileGo('whatsapp-leads')"><span>◉</span><b>Leads</b></button>
+  <button type="button" data-mobile-go="intentions" onclick="mobileGo('intentions')"><span>⌁</span><b>Radar</b></button>
+  <button type="button" class="mobile-nav-match" data-mobile-go="matches" onclick="mobileGo('matches')"><span>✦</span><b>Match</b></button>
+  <button type="button" data-mobile-go="__more__" onclick="toggleMobileMenu()"><span>☰</span><b>Mais</b></button>
+</nav>
+<div id="mobileMoreSheet" class="mobile-more-sheet hidden" onclick="if(event.target===this)toggleMobileMenu(false)">
+  <div class="mobile-more-panel"><div class="mobile-more-head"><strong>Menu</strong><button onclick="toggleMobileMenu(false)">×</button></div><div id="mobileMenuGrid" class="mobile-menu-grid"></div></div>
+</div>
+<div id="toast" class="toast"></div>
+<div class="build-badge" title="Versão carregada agora">v22.50 · Filtros de Qualidade</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <script src="./app-core.js?v=22.50.1"></script>
+  <script src="./app-backend.js?v=22.50.1"></script>
+  <script src="./app-auth.js?v=22.50.1"></script>
+</body>
+</html>
