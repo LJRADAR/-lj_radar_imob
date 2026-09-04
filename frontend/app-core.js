@@ -2423,6 +2423,10 @@ const LJI_PLURAL_CATALOG=/^(apartamentos|casas|kitnets|im[oó]veis|coberturas|so
 // ofertas diferentes — assinatura de página de portal/agregador.
 const LJI_TITLE_BRAND_SUFFIX=/\|\s*[A-ZÀ-Ú][\wÀ-ú&]+\s*$/;
 function ljiChainedListings(txt){return (String(txt||'').match(/\|/g)||[]).length>=2}
+// Duas ou mais cidades diferentes no mesmo título/texto ("...em Osasco - SP
+// | ...em Diadema - SP") é anúncio agregando ofertas de lugares diferentes —
+// ninguém descreve o próprio imóvel citando duas cidades separadas.
+function ljiMultiCityText(txt){return ((String(txt||'').match(/[-–,]\s*SP\b/gi))||[]).length>=2}
 
 // Código/referência interna de anúncio ("CÓDIGO: 13797", "REF: 19999") — só
 // imobiliária/CRM usa isso; proprietário não numera o próprio anúncio.
@@ -2433,6 +2437,24 @@ const LJI_LISTING_CODE=/\b(c[oó]digo|cod\.?|ref\.?|refer[eê]ncia)\s*:?\s*\d{3,
 // registrada de copy templada, não de gente descrevendo o próprio imóvel.
 const LJI_AD_COPY_MARKERS=/(excelente custo-beneficio|distribuicao dos ambientes|garantindo qualidade de vida|representando uma oportunidade|oferecendo praticidade e conforto|ideal para quem busca|nao perca essa oportunidade|agende sua visita|interessados podem entrar em contato|pronto para morar|localizacao privilegiada|excelente localizacao|otima localizacao|conheca este imovel|entre em contato conosco|solicite mais informacoes)/g;
 function ljiLooksLikeAdCopy(txt){return ((txt.match(LJI_AD_COPY_MARKERS)||[]).length)>=2}
+
+// "Imóveis"/"Imobiliária" sozinho no corpo do texto é comum até em post de
+// dono ("vendo meu imóvel") — por isso nunca bloqueei a palavra isolada.
+// Mas no NOME DA CONTA (antes de "no Instagram:"/"no Facebook:") é outra
+// coisa: "Roque Imóveis", "Gonçalves Imóveis Piracicaba", "CAMERRO IMÓVEIS"
+// são nome de empresa. Ninguém nomeia o próprio perfil pessoal assim.
+function ljiPosterName(nome){
+ const m=String(nome||'').match(/^(.*?)\s+no\s+(?:Instagram|Facebook|Threads|X|Telegram|TikTok|YouTube)\s*:/i);
+ return (m?m[1]:nome||'').trim();
+}
+const LJI_POSTER_BUSINESS_NAME=/\b(imoveis|imobiliaria|imobiliarios|imob)\b/;
+
+// Ofertar financiamento/entrada facilitada pro comprador é serviço de
+// imobiliária ou incorporadora — dono comum não "faz financiamento" de
+// ninguém. Diferente das frases de LJI_AD_COPY_MARKERS (que exigem 2+
+// porque isoladas podem ser coincidência), qualquer uma destas sozinha já
+// é sinal forte o bastante.
+const LJI_FINANCING_SERVICE=/(fazemos seu financiamento|facilitamos (?:o )?financiamento|financiamento facilitado|entrada facilitada|pouca comprovacao de renda|simulacao de financiamento|credito facilitado|aceita(?:mos)? fgts|use seu fgts)/;
 
 // Lista negra manual: nomes que você marcar como lead ruim.
 // Editável em Configurações → nomes bloqueados (ou aqui, um por linha).
@@ -2449,15 +2471,19 @@ function ljiNomeBloqueado(nome){
 const LJI_CATALOG_MARKERS=/(imoveis-seo|\/blog\/|\/busca|\/search|\/categoria|apartamentos (?:a venda|para alugar|ate)|imoveis que aceitam|kitnets \/ lofts|fale conosco)/;
 function ljiLooksProfessional(x){
  const nomeOriginal=String(x.name||'');
+ const posterName=ljiPosterName(nomeOriginal).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const txt=[x.name,x.subject,x.source,(x.sourceUrls||[]).join(' ')].join(' ')
    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  return LJI_PRO_MARKERS.test(txt)
      || LJI_CATALOG_MARKERS.test(txt)
      || LJI_MARKETING_MARKERS.test(txt)
      || LJI_LISTING_CODE.test(txt)
+     || LJI_FINANCING_SERVICE.test(txt)
+     || LJI_POSTER_BUSINESS_NAME.test(posterName)
      || LJI_PLURAL_CATALOG.test(nomeOriginal.trim())
      || LJI_TITLE_BRAND_SUFFIX.test(nomeOriginal.trim())
      || ljiChainedListings(x.name)||ljiChainedListings(x.subject)
+     || ljiMultiCityText(x.name)||ljiMultiCityText(x.subject)
      || ljiLooksLikeAdCopy(txt)
      || ljiLooksFoodOrOffTopic(txt)
      || ljiNomeBloqueado(x.name);
