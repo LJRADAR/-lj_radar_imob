@@ -2355,7 +2355,7 @@ function collectWhatsAppLeads(){
    source:sources.join(' + '),sourceUrls:urls,phone,whatsapp,date:g.members.map(m=>m.published_at).filter(Boolean).sort().reverse()[0]||'',
    qaStatus,qaMatchUrl:qaUrls[0]||'',contactState,verified:g.status==='verificado_manual',
    leadState,leadStatusLabel,operationalStatuses:g.operationalStatuses||[]};
- }).filter(x=>!ljiIsDiscarded(x)&&!ljiLooksProfessional(x)).sort((a,b)=>{
+ }).filter(x=>!ljiIsDiscarded(x)&&!ljiLooksProfessional(x)&&!ljiLacksListingSignal(x)).sort((a,b)=>{
   if(a.leadState!==b.leadState)return a.leadState==='active'?-1:1;
   return (new Date(b.date).getTime()||0)-(new Date(a.date).getTime()||0)
  })
@@ -2455,6 +2455,30 @@ const LJI_POSTER_BUSINESS_NAME=/\b(imoveis|imobiliaria|imobiliarios|imob)\b/;
 // porque isoladas podem ser coincidência), qualquer uma destas sozinha já
 // é sinal forte o bastante.
 const LJI_FINANCING_SERVICE=/(fazemos seu financiamento|facilitamos (?:o )?financiamento|financiamento facilitado|entrada facilitada|pouca comprovacao de renda|simulacao de financiamento|credito facilitado|aceita(?:mos)? fgts|use seu fgts)/;
+
+// ------------------------------------------------------------------
+// EXIGÊNCIA DE SINAL POSITIVO DE ANÚNCIO
+//
+// Até aqui, o filtro bloqueava categoria por categoria (corretor,
+// imobiliária, receita, marketing...) — jogo sem fim, porque qualquer
+// assunto que mencione "casa"/"apartamento"/"cobertura" de outro jeito
+// (álbum de música, receita de bolo, portfólio de design, post de
+// nostalgia, escola de dança) vira um novo buraco pra tapar.
+//
+// A virada: em vez de continuar bloqueando assunto por assunto, passa
+// a EXIGIR que o texto tenha pelo menos um sinal de que é um anúncio de
+// verdade — preço, verbo de venda/aluguel junto do tipo de imóvel, ou
+// contato encontrado. Sem nenhum dos três, não é imóvel à venda/aluguel,
+// não importa do que mais fale.
+// ------------------------------------------------------------------
+const LJI_PRICE_SIGNAL=/r\$\s?\d|valor(?:\s+d[ao])?\s+(?:aluguel|locacao|venda)|aluguel:?\s*r?\$?\s*\d|condominio:?\s*r?\$?\s*\d/;
+const LJI_TRANSACTION_SIGNAL=/\b(vende-?se|aluga-?se|vendo\s+(?:meu|minha|o|a)?\s*(?:apartamento|casa|kitnet|sobrado|cobertura|studio|imovel)|alugo\s+(?:meu|minha|o|a)?\s*(?:apartamento|casa|kitnet|sobrado|studio|imovel)|repasse\s*(?:de)?\s*(?:apartamento|casa))\b/;
+function ljiLacksListingSignal(x){
+ const contactOk=x.contactState==='whatsapp'||x.contactState==='phone';
+ if(contactOk)return false;
+ const txt=[x.name,x.subject].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ return !LJI_PRICE_SIGNAL.test(txt)&&!LJI_TRANSACTION_SIGNAL.test(txt);
+}
 
 // Lista negra manual: nomes que você marcar como lead ruim.
 // Editável em Configurações → nomes bloqueados (ou aqui, um por linha).
@@ -2957,9 +2981,26 @@ function pipelineBuyerContact(b){
 function ljiPipelineLooksProfessional(o){
  if(!o)return false;
  if(o.advertiser_classification==='broker')return true; // classificação que o próprio backend já fez
+ const nomeOriginal=String(o.title||o.contact_name||'');
+ const posterName=ljiPosterName(nomeOriginal).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const txt=[o.title,o.contact_name,o.description,o.person_name,o.source,o.source_name].filter(Boolean).join(' ')
    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- return LJI_PRO_MARKERS.test(txt)||LJI_CATALOG_MARKERS.test(txt)||LJI_MARKETING_MARKERS.test(txt)||ljiLooksFoodOrOffTopic(txt);
+ const isProfessional=LJI_PRO_MARKERS.test(txt)||LJI_CATALOG_MARKERS.test(txt)||LJI_MARKETING_MARKERS.test(txt)
+   ||LJI_LISTING_CODE.test(txt)||LJI_FINANCING_SERVICE.test(txt)||LJI_POSTER_BUSINESS_NAME.test(posterName)
+   ||LJI_PLURAL_CATALOG.test(nomeOriginal.trim())||LJI_TITLE_BRAND_SUFFIX.test(nomeOriginal.trim())
+   ||ljiChainedListings(o.title)||ljiMultiCityText(o.title)||ljiLooksLikeAdCopy(txt)||ljiLooksFoodOrOffTopic(txt);
+ if(isProfessional)return true;
+ // Mesma exigência de sinal positivo do restante do sistema: preço real,
+ // telefone que passe na validação de DDD, ou verbo de venda/aluguel junto
+ // do tipo de imóvel. As três "oportunidades" que motivaram esta correção
+ // tinham preço nulo e o mesmo telefone com DDD inexistente (10).
+ const temPreco=Number(o.price||0)>0;
+ // Este campo às vezes chega com 55 (Brasil) na frente; ljiPhoneValido espera
+ // só o número nacional (10-11 dígitos), então tira o prefixo antes de checar.
+ const semDDI=v=>{const d=String(v||'').replace(/\D/g,'');return d.length>11&&d.startsWith('55')?d.slice(2):d};
+ const foneValido=ljiPhoneValido(semDDI(o.contact_phone))||ljiPhoneValido(semDDI(o.whatsapp_url));
+ if(temPreco||foneValido)return false;
+ return !LJI_PRICE_SIGNAL.test(txt)&&!LJI_TRANSACTION_SIGNAL.test(txt);
 }
 function pipelineEntities(){
   const latest=pipelineLatestMap(),rows=[];
