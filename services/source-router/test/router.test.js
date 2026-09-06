@@ -19,3 +19,9 @@ test('SP zone requires known neighborhood evidence', () => {
   assert.equal(locationMatchesTarget('São Paulo Zona Sul', 'São Paulo', 'Tatuapé'), false);
   assert.equal(locationMatchesTarget('São Paulo Zona Sul', 'Osasco', 'Moema'), false);
 });
+
+test('null property type remains broad instead of forcing apartment', () => {
+  const result = validateRequest({ state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'rent', property_type_code: null });
+  assert.equal(result.ok, true);
+  assert.equal(result.request.property_type_code, null);
+});
