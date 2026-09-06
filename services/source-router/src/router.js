@@ -11,7 +11,7 @@ export function validateRequest(body) {
     state_code: String(body?.state_code || '').trim().toUpperCase(),
     city: String(body?.city || '').trim(),
     transaction_type: body?.transaction_type === 'rent' ? 'rent' : body?.transaction_type === 'sale' ? 'sale' : null,
-    property_type_code: body?.property_type_code ? String(body.property_type_code).trim() : 'apartamento',
+    property_type_code: body?.property_type_code ? String(body.property_type_code).trim() : null,
     limit: Number(body?.limit || 30),
   };
   if (request.state_code !== 'SP') return { ok: false, error: 'state_not_supported' };
