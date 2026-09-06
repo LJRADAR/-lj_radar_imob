@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: lji-source-router
+    runtime: node
+    rootDir: services/source-router
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: LJI_SOURCE_ROUTER_TOKEN
+        generateValue: true
+      - key: MERCADOLIVRE_ACCESS_TOKEN
+        sync: false
+      - key: SOURCE_REQUEST_TIMEOUT_MS
+        value: "9000"
