@@ -100,30 +100,50 @@ function normalizedItem(item, request) {
   };
 }
 
+function requestedPropertyTypes(code) {
+  if (code) return [String(code)];
+  return ['apartamento', 'casa', 'cobertura', 'studio'];
+}
+
 export async function collectMercadoLivre(request, { token, timeoutMs }) {
   if (!token) {
     return { ok: false, status: 'not_configured', source: 'mercadolivre', results: [], error: 'MERCADOLIVRE_ACCESS_TOKEN_missing' };
   }
-  const categoryId = await leafCategory(token, timeoutMs, request.property_type_code, request.transaction_type);
-  const q = canonicalCity(request.city);
-  const limit = Math.max(1, Math.min(50, Number(request.limit || 30)));
-  const url = new URL(`${API}/sites/${SITE}/search`);
-  url.searchParams.set('category', categoryId);
-  url.searchParams.set('q', q);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('include_filters', 'false');
 
-  const payload = await fetchJson(url.toString(), { token, timeoutMs });
-  const results = (Array.isArray(payload?.results) ? payload.results : [])
-    .map((item) => normalizedItem(item, request))
-    .filter(Boolean);
+  const types = requestedPropertyTypes(request.property_type_code);
+  const totalLimit = Math.max(1, Math.min(80, Number(request.limit || 40)));
+  const perTypeLimit = Math.max(5, Math.min(30, Math.ceil(totalLimit / types.length)));
+  const dedupe = new Map();
+  const categoryIds = {};
+  let rawCount = 0;
 
+  for (const propertyType of types) {
+    const categoryId = await leafCategory(token, timeoutMs, propertyType, request.transaction_type);
+    categoryIds[propertyType] = categoryId;
+    const q = canonicalCity(request.city);
+    const url = new URL(`${API}/sites/${SITE}/search`);
+    url.searchParams.set('category', categoryId);
+    url.searchParams.set('q', q);
+    url.searchParams.set('limit', String(perTypeLimit));
+    url.searchParams.set('include_filters', 'false');
+
+    const payload = await fetchJson(url.toString(), { token, timeoutMs });
+    const items = Array.isArray(payload?.results) ? payload.results : [];
+    rawCount += items.length;
+    for (const item of items) {
+      const normalized = normalizedItem(item, { ...request, property_type_code: propertyType });
+      if (!normalized?.source_item_id || !normalized?.source_url) continue;
+      if (!dedupe.has(normalized.source_item_id)) dedupe.set(normalized.source_item_id, normalized);
+    }
+  }
+
+  const results = Array.from(dedupe.values()).slice(0, totalLimit);
   return {
     ok: true,
     status: 'completed',
     source: 'mercadolivre',
-    category_id: categoryId,
-    raw_count: Array.isArray(payload?.results) ? payload.results.length : 0,
+    category_ids: categoryIds,
+    raw_count: rawCount,
     qualified_count: results.length,
     results,
   };
