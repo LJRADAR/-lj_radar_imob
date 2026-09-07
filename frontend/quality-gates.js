@@ -6,6 +6,7 @@
 
   const MAX_PUBLICATION_DAYS=365;
   const MAX_FUTURE_MS=86400000;
+  const COMMERCIAL_STATUSES=new Set(['approved','hot']);
 
   function verifiedPublication(o){
     const raw=o?.published_at||'';
@@ -17,8 +18,9 @@
   }
 
   function approvedOpportunity(o){
+    const status=String(o?.status||'').toLowerCase();
     return Boolean(o?.is_current)
-      && String(o?.status||'').toLowerCase()==='approved'
+      && COMMERCIAL_STATUSES.has(status)
       && verifiedPublication(o);
   }
 
@@ -35,15 +37,17 @@
     };
   }
 
-  // Match remoto: o imóvel precisa ter data real e válida. A intenção pode manter
-  // captured_at como recência enquanto a fonte social não entrega published_at,
-  // mas nunca promovemos um imóvel sem publicação comprovada.
+  // Match remoto: exige status comercial aprovado/hot e data real do imóvel.
+  // A intenção pode manter captured_at como recência enquanto a fonte social não
+  // entrega published_at, mas review nunca vira match acionável.
   if(typeof matchFilteredRows==='function'){
     matchFilteredRows=function(applySource=true){
       const source=applySource?(document.getElementById('matchSourceFilter')?.value||''):'';
       const rows=Array.isArray(intentMatchesRemote)?intentMatchesRemote:[];
       return rows.filter(m=>{
         const sourceOk=!source||matchSourceName(m.opportunity_source)===source||matchSourceName(m.intent_source_name)===source;
+        const status=String(m.radar_status||'').toLowerCase();
+        if(!COMMERCIAL_STATUSES.has(status))return false;
         const opportunityRaw=m.opportunity_published_at||'';
         if(!opportunityRaw)return false;
         const d=new Date(opportunityRaw);
@@ -83,7 +87,7 @@
     };
   }
 
-  // A grade/exportação do Dashboard também é área comercial: somente approved.
+  // A grade/exportação do Dashboard também é área comercial: approved ou hot.
   if(typeof dashboardFilteredRows==='function'){
     const baseDashboardFilteredRows=dashboardFilteredRows;
     dashboardFilteredRows=function(){
@@ -179,7 +183,7 @@
     };
   }
 
-  // Relatórios financeiros/VGV devem considerar somente oportunidades aprovadas.
+  // Relatórios financeiros/VGV devem considerar somente oportunidades comerciais.
   if(typeof renderReports==='function'){
     const baseReports=renderReports;
     renderReports=function(){
@@ -203,25 +207,29 @@
   }
 
   // O Dashboard continua mostrando reviews para triagem, mas deixa explícito o
-  // estado real da base e usa somente aprovados nos elementos de prioridade.
+  // estado real da base e usa approved/hot nos elementos acionáveis.
   if(typeof renderDashboard==='function'){
     const baseDashboard=renderDashboard;
     renderDashboard=function(){
       const result=baseDashboard();
       const current=(Array.isArray(owners)?owners:[]).filter(o=>o?.is_current&&o?.status!=='rejected');
-      const approved=current.filter(approvedOpportunity);
+      const approved=current.filter(o=>String(o?.status||'').toLowerCase()==='approved'&&verifiedPublication(o));
+      const hot=current.filter(o=>String(o?.status||'').toLowerCase()==='hot'&&verifiedPublication(o));
+      const commercial=current.filter(approvedOpportunity);
       const review=current.filter(o=>String(o?.status||'').toLowerCase()==='review');
       const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
       set('mOwners',current.length);
-      set('mUnassigned',approved.filter(o=>!o?.handled_by_user_id).length);
-      set('mOwnersMeta',`${approved.length} aprovada${approved.length===1?'':'s'} · ${review.length} em revisão · ${owners.length} no histórico`);
-      set('dashCountLabel',`${approved.length} aprovada${approved.length===1?'':'s'} · ${review.length} em revisão`);
+      set('mUnassigned',commercial.filter(o=>!o?.handled_by_user_id).length);
+      set('mOwnersMeta',`${approved.length} aprovada${approved.length===1?'':'s'} · ${hot.length} quente${hot.length===1?'':'s'} · ${review.length} em revisão · ${owners.length} no histórico`);
+      set('dashCountLabel',`${commercial.length} comercial${commercial.length===1?'':'is'} · ${review.length} em revisão`);
       window.LJI_DASHBOARD_DIAGNOSTIC={
         ...(window.LJI_DASHBOARD_DIAGNOSTIC||{}),
         approved:approved.length,
+        hot:hot.length,
+        commercial:commercial.length,
         review:review.length,
         publicationGateDays:MAX_PUBLICATION_DAYS,
-        frontendQualityGate:'approved+real_published_at'
+        frontendQualityGate:'approved_or_hot+real_published_at'
       };
       return result;
     };
@@ -286,11 +294,12 @@
   }
 
   window.LJI_FRONTEND_QUALITY_GATES={
-    version:'1.2.0',
-    matchRequiresApproved:true,
+    version:'1.3.0',
+    commercialStatuses:['approved','hot'],
+    matchRequiresApprovedOrHot:true,
     matchRequiresRealPublishedAt:true,
     maxPublicationDays:MAX_PUBLICATION_DAYS,
-    dashboardPrioritiesRequireApproved:true,
+    dashboardPrioritiesRequireCommercialStatus:true,
     collectorStatusUsesLiveHealth:true
   };
 
