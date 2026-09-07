@@ -170,12 +170,71 @@
     };
   }
 
+  async function refreshCollectorHealth(){
+    const cfg=window.LJI_CONFIG||{};
+    const banner=document.getElementById('collectorServerBanner');
+    const title=document.getElementById('collectorServerStatus');
+    const meta=document.getElementById('collectorServerMeta');
+    if(!banner||!title||!meta||!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY)return;
+
+    const base=String(cfg.SUPABASE_URL).replace(/\/+$/,'');
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    try{
+      const response=await fetch(`${base}/functions/v1/coletor-lj-v2`,{
+        method:'POST',
+        headers:{
+          apikey:String(cfg.SUPABASE_ANON_KEY),
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({action:'health'}),
+        signal:controller.signal
+      });
+      const data=await response.json().catch(()=>({}));
+      window.LJI_COLLECTOR_HEALTH={...data,http_status:response.status,checked_at:new Date().toISOString()};
+      banner.classList.remove('collector-ok','collector-error','collector-neutral');
+
+      if(!response.ok||data?.ok!==true){
+        banner.classList.add('collector-neutral');
+        title.textContent='Coleta automática · status atual indisponível';
+        meta.textContent='Não foi possível confirmar o health atual do coletor. O último run histórico não é tratado como prova de coleta ativa.';
+        return;
+      }
+
+      if(data.collection_enabled===true){
+        const ready=Array.isArray(data.ready_sources)?data.ready_sources.filter(Boolean):[];
+        banner.classList.add('collector-ok');
+        title.textContent='Coleta automática pronta';
+        meta.textContent=`Source Router ${data.router_version||'online'} · fonte${ready.length===1?'':'s'} pronta${ready.length===1?'':'s'}: ${ready.length?ready.join(', '):'configurada'}.`;
+        return;
+      }
+
+      const reasons=[];
+      if(data.source_router_url_configured!==true)reasons.push('Source Router sem URL');
+      if(data.router_auth_signing_configured!==true)reasons.push('assinatura interna não configurada');
+      if(data.router_reachable===false)reasons.push('Source Router indisponível');
+      if(Array.isArray(data.ready_sources)&&data.ready_sources.length===0)reasons.push('aguardando credenciais das fontes (Apify/Threads)');
+      banner.classList.add('collector-neutral');
+      title.textContent='Coleta automática pausada';
+      meta.textContent=(reasons.length?reasons.join(' · '):'Nenhuma fonte está pronta para coleta.')+' A base existente permanece preservada.';
+    }catch(e){
+      window.LJI_COLLECTOR_HEALTH={ok:false,error:String(e?.message||e),checked_at:new Date().toISOString()};
+      banner.classList.remove('collector-ok','collector-error');
+      banner.classList.add('collector-neutral');
+      title.textContent='Coleta automática · status atual indisponível';
+      meta.textContent='O health atual não respondeu; o último run histórico não é tratado como prova de coleta ativa.';
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
   window.LJI_FRONTEND_QUALITY_GATES={
-    version:'1.0.0',
+    version:'1.1.0',
     matchRequiresApproved:true,
     matchRequiresRealPublishedAt:true,
     maxPublicationDays:MAX_PUBLICATION_DAYS,
-    dashboardPrioritiesRequireApproved:true
+    dashboardPrioritiesRequireApproved:true,
+    collectorStatusUsesLiveHealth:true
   };
 
   setTimeout(()=>{
@@ -183,5 +242,8 @@
     try{renderDashboard?.()}catch(e){console.error('Quality gate · dashboard:',e)}
     try{renderReports?.()}catch(e){console.error('Quality gate · reports:',e)}
     try{window.renderPipeline?.()}catch(e){console.error('Quality gate · pipeline:',e)}
-  },0);
+    refreshCollectorHealth();
+  },500);
+  setTimeout(refreshCollectorHealth,4000);
+  setInterval(refreshCollectorHealth,120000);
 })();
