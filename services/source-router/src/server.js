@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 import { verifyQuinto } from './adapters/quinto.js';
 
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const MAX_BODY_BYTES = 128000;
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
