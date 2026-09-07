@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 import { verifyQuinto } from './adapters/quinto.js';
 
-const VERSION = '1.6.1';
+const VERSION = '1.6.2';
 const MAX_BODY_BYTES = 128000;
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
@@ -157,12 +157,16 @@ const server = http.createServer(async (req, res) => {
 
     const rawBody = await readRawBody(req);
     const auth = await authorized(req, rawBody, url.pathname);
-    if (!auth.ok) return send(res, 401, { ok: false, error: auth.error || 'unauthorized', version: VERSION });
+    if (!auth.ok) {
+      console.warn(`auth failed ${url.pathname}: ${auth.error || 'unauthorized'}`);
+      return send(res, 401, { ok: false, error: auth.error || 'unauthorized', version: VERSION });
+    }
 
     let body;
     try {
       body = rawBody ? JSON.parse(rawBody) : {};
     } catch {
+      console.warn(`invalid json ${url.pathname}`);
       return send(res, 400, { ok: false, error: 'invalid_json', version: VERSION });
     }
 
@@ -182,12 +186,28 @@ const server = http.createServer(async (req, res) => {
     }
 
     const validation = validateRequest(body);
-    if (!validation.ok) return send(res, 400, { ok: false, error: validation.error, version: VERSION });
+    if (!validation.ok) {
+      console.warn(`collect validation failed: ${validation.error}`);
+      return send(res, 400, { ok: false, error: validation.error, version: VERSION });
+    }
 
     const result = await routeCollection(validation.request, config);
     const status = result.ok ? 200 : result.status === 'not_configured' ? 503 : 502;
+    console.log('collect result', JSON.stringify({
+      ok: Boolean(result.ok),
+      status: result.status || null,
+      error: result.error || null,
+      source: validation.request.source || null,
+      city: validation.request.city || null,
+      transaction_type: validation.request.transaction_type || null,
+      raw_count: Number(result.raw_count || 0),
+      qualified_count: Number(result.qualified_count || 0),
+      result_count: Array.isArray(result.results) ? result.results.length : 0,
+      source_report: Array.isArray(result.source_report) ? result.source_report : [],
+    }));
     return send(res, status, { ...result, router_version: VERSION });
   } catch (error) {
+    console.error('request failed', error instanceof Error ? error.message : String(error));
     return send(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error), version: VERSION });
   }
 });
