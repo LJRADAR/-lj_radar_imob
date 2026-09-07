@@ -40,3 +40,5 @@ jobs:
           node --check src/http.js
           node --check src/adapters/mercadolivre.js
           node --check src/adapters/threads.js
+          node --check src/adapters/apify.js
+          node --check src/adapters/quinto.js
