@@ -1,0 +1,42 @@
+name: Source Router CI
+
+on:
+  push:
+    paths:
+      - 'services/source-router/**'
+      - '.github/workflows/source-router-ci.yml'
+      - 'render.yaml'
+  pull_request:
+    paths:
+      - 'services/source-router/**'
+      - '.github/workflows/source-router-ci.yml'
+      - 'render.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/source-router
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/source-router/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Syntax check
+        run: |
+          node --check src/server.js
+          node --check src/router.js
+          node --check src/config.js
+          node --check src/normalize.js
+          node --check src/http.js
+          node --check src/adapters/mercadolivre.js
+          node --check src/adapters/threads.js
