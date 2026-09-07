@@ -29,6 +29,15 @@ export function validateRequest(body) {
   return { ok: true, request };
 }
 
+function apifyTaskIdFor(source, request, config) {
+  if (source === 'olx') {
+    return config.apifyOlxTasks?.[request.city]
+      || config.apifyTasks?.olx
+      || '';
+  }
+  return config.apifyTasks?.[source] || '';
+}
+
 async function runAdapter(source, request, config) {
   if (source === 'threads') {
     return collectThreads(request, { token: config.threadsToken, timeoutMs: config.requestTimeoutMs });
@@ -36,7 +45,7 @@ async function runAdapter(source, request, config) {
   if (APIFY_SOURCES.has(source)) {
     return collectApifyTask(request, {
       token: config.apifyToken,
-      taskId: config.apifyTasks?.[source] || '',
+      taskId: apifyTaskIdFor(source, request, config),
       source,
       timeoutMs: config.requestTimeoutMs,
       timeoutSecs: config.apifyTimeoutSecs,
@@ -46,17 +55,23 @@ async function runAdapter(source, request, config) {
   return { ok: false, status: 'unsupported', source, results: [], error: 'source_not_supported' };
 }
 
-function allSources(config) {
+function sourceConfigured(source, request, config) {
+  if (source === 'threads') return Boolean(config.threadsToken);
+  if (!APIFY_SOURCES.has(source) || !config.apifyToken) return false;
+  return Boolean(apifyTaskIdFor(source, request, config));
+}
+
+function allSources(request, config) {
   const sources = [];
   if (config.threadsToken) sources.push('threads');
   for (const source of APIFY_SOURCES) {
-    if (config.apifyToken && config.apifyTasks?.[source]) sources.push(source);
+    if (sourceConfigured(source, request, config)) sources.push(source);
   }
   return sources;
 }
 
 export async function routeCollection(request, config) {
-  const requestedSources = request.source === 'all' ? allSources(config) : [request.source];
+  const requestedSources = request.source === 'all' ? allSources(request, config) : [request.source];
   const settled = await Promise.all(requestedSources.map(async (source) => {
     try {
       return await runAdapter(source, request, config);
