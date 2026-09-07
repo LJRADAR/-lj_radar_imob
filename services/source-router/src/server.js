@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 
-const VERSION = '1.1.1';
+const VERSION = '1.2.0';
 
 function send(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -36,8 +36,8 @@ async function readJson(req) {
 
 function healthPayload() {
   const sources = {
-    mercadolivre: config.mercadoLivreToken ? 'ready' : 'needs_token',
     threads: config.threadsToken ? 'ready' : 'needs_token',
+    mercadolivre: 'disabled_pending_official_access',
   };
   return {
     ok: true,
@@ -45,10 +45,12 @@ function healthPayload() {
     version: VERSION,
     configured: {
       router_token: Boolean(config.routerToken),
-      mercadolivre: Boolean(config.mercadoLivreToken),
       threads: Boolean(config.threadsToken),
+      mercadolivre: false,
     },
-    collection_ready: Boolean(config.routerToken && (config.mercadoLivreToken || config.threadsToken)),
+    collection_ready: Boolean(config.routerToken && config.threadsToken),
+    active_sources: ['threads'],
+    disabled_sources: ['mercadolivre'],
     sources,
   };
 }
