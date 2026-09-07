@@ -34,6 +34,59 @@
     errorEl.classList.remove('show');
   }
 
+  function readStoredWorkspace(){
+    try{return window.localStorage.getItem('lji_workspace_id')||null}catch(_){return null}
+  }
+
+  function persistWorkspace(workspaceId){
+    const value=String(workspaceId||'').trim();
+    cfg.WORKSPACE_ID=value||null;
+    window.LJI_CURRENT_WORKSPACE_ID=value||null;
+    try{
+      if(value)window.localStorage.setItem('lji_workspace_id',value);
+      else window.localStorage.removeItem('lji_workspace_id');
+    }catch(_){}
+  }
+
+  function clearWorkspace(){persistWorkspace(null)}
+
+  async function resolveMembership(userId){
+    const {data, error} = await authClient
+      .from('lji_workspace_members')
+      .select('workspace_id,role,is_active,permissions,created_at')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at',{ascending:true})
+      .limit(50);
+
+    if(error) throw error;
+    const memberships=Array.isArray(data)?data:[];
+    if(!memberships.length){
+      clearWorkspace();
+      return null;
+    }
+
+    const preferred=String(cfg.WORKSPACE_ID||readStoredWorkspace()||'').trim();
+    let member=preferred?memberships.find(row=>String(row.workspace_id)===preferred):null;
+    if(!member && memberships.length===1) member=memberships[0];
+    if(!member){
+      const err=new Error('workspace_selection_required');
+      err.workspaces=memberships.map(row=>({workspace_id:row.workspace_id,role:row.role}));
+      throw err;
+    }
+
+    persistWorkspace(member.workspace_id);
+    window.LJI_AVAILABLE_WORKSPACES=memberships.map(row=>({workspace_id:row.workspace_id,role:row.role}));
+    return member;
+  }
+
+  function membershipErrorMessage(e){
+    if(String(e?.message||'')==='workspace_selection_required'){
+      return 'Este usuário possui acesso a mais de um workspace. É necessário selecionar o workspace antes de entrar.';
+    }
+    return 'Não foi possível validar a permissão do usuário.';
+  }
+
   async function forgotPassword(){
     const email = (emailEl.value || '').trim();
 
@@ -66,18 +119,6 @@
       forgotEl.textContent = 'Esqueceu sua senha?';
     }
   }
-  async function verifyMembership(userId){
-    const {data, error} = await authClient
-      .from('lji_workspace_members')
-      .select('role,is_active,permissions')
-      .eq('workspace_id', cfg.WORKSPACE_ID)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if(error) throw error;
-    return data;
-  }
 
   async function login(){
     const email = (emailEl.value || '').trim();
@@ -105,8 +146,9 @@
     }
 
     try{
-      const member = await verifyMembership(data.user.id);
+      const member = await resolveMembership(data.user.id);
       if(!member){
+        clearWorkspace();
         await authClient.auth.signOut();
         showError('Este usuário não tem acesso ao LJ Radar Imob.');
         loginBtn.disabled = false;
@@ -116,8 +158,9 @@
       window.location.reload();
     }catch(e){
       console.error(e);
+      clearWorkspace();
       await authClient.auth.signOut();
-      showError('Não foi possível validar a permissão do usuário.');
+      showError(membershipErrorMessage(e));
       loginBtn.disabled = false;
       loginBtn.textContent = 'Entrar';
     }
@@ -175,6 +218,7 @@
       confirmPasswordEl.value = '';
 
       setTimeout(async ()=>{
+        clearWorkspace();
         await authClient.auth.signOut();
         recoveryOverlay.classList.add('hidden');
         overlay.classList.remove('hidden');
@@ -250,6 +294,7 @@
 
   authClient.auth.onAuthStateChange((event)=>{
     if(event === 'PASSWORD_RECOVERY') openRecovery();
+    if(event === 'SIGNED_OUT') clearWorkspace();
   });
 
   handleRecoveryFromUrl();
@@ -266,12 +311,32 @@
     const isRecoveryUrl = params.includes('type=recovery') || params.includes('access_token=') || params.includes('token_hash=');
     if(isRecoveryUrl)return;
     if(!data.session){overlay.classList.remove('hidden');return}
-    const member=await verifyMembership(data.session.user.id);
-    if(!member){await authClient.auth.signOut();showError('Este usuário não tem acesso ao LJ Radar Imob.');overlay.classList.remove('hidden');return}
+
+    const previousWorkspace=String(cfg.WORKSPACE_ID||'').trim();
+    const member=await resolveMembership(data.session.user.id);
+    if(!member){
+      clearWorkspace();
+      await authClient.auth.signOut();
+      showError('Este usuário não tem acesso ao LJ Radar Imob.');
+      overlay.classList.remove('hidden');
+      return;
+    }
+
+    // Se esta sessão ainda não tinha workspace validado, o app-backend já pode ter
+    // iniciado em modo local. Recarrega uma única vez com o workspace validado.
+    if(previousWorkspace !== String(cfg.WORKSPACE_ID||'')){
+      window.location.reload();
+      return;
+    }
+
     overlay.classList.add('hidden');
-  }).catch(error=>{
+  }).catch(async error=>{
     console.error('Validação da sessão:',error);
-    showError('Não foi possível validar a sessão. O painel permaneceu bloqueado.');
+    if(String(error?.message||'')==='workspace_selection_required'){
+      showError(membershipErrorMessage(error));
+    }else{
+      showError('Não foi possível validar a sessão. O painel permaneceu bloqueado.');
+    }
     overlay.classList.remove('hidden');
   });
 })();
