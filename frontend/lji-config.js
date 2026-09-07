@@ -19,3 +19,16 @@ window.LJI_CONFIG = {
     // "Nome da imobiliária"
   ]
 };
+
+// Camada pequena e isolada que alinha Match/Dashboard/Pipeline aos gates do backend.
+// É carregada somente depois que app-core.js/app-backend.js já definiram as funções,
+// evitando reescrever o arquivo principal e reduzindo risco de regressão.
+window.addEventListener('load', () => {
+  if (document.querySelector('script[data-lji-quality-gates]')) return;
+  const script = document.createElement('script');
+  script.src = 'quality-gates.js?v=20260907-1';
+  script.async = true;
+  script.dataset.ljiQualityGates = '1';
+  script.onerror = () => console.error('LJ Radar: quality-gates.js não carregou.');
+  document.head.appendChild(script);
+});
