@@ -1,5 +1,6 @@
 import { collectThreads } from './adapters/threads.js';
 import { collectApifyTask } from './adapters/apify.js';
+import { canonicalSourceKey, filterQualifiedRows } from './quality.js';
 
 const CORE_TARGETS = new Set([
   'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema',
@@ -72,17 +73,20 @@ export async function routeCollection(request, config) {
 
   for (const result of settled) {
     const rows = Array.isArray(result?.results) ? result.results : [];
+    const quality = filterQualifiedRows(rows, result?.source || 'unknown');
     if (result?.status !== 'not_configured') readySources += 1;
     if (result?.ok === true) successfulSources += 1;
     rawCount += Number(result?.raw_count || 0);
-    results.push(...rows);
+    results.push(...quality.accepted);
     sourceReport.push({
       source: result?.source || 'unknown',
       provider: result?.provider || (result?.source === 'threads' ? 'threads_api' : null),
       ok: result?.ok === true,
       status: result?.status || 'unknown',
       raw_count: Number(result?.raw_count || 0),
-      qualified_count: Number(result?.qualified_count || rows.length),
+      qualified_count: quality.accepted.length,
+      quality_rejected_count: quality.rejected_count,
+      quality_rejection_reasons: quality.rejection_reasons,
       error: result?.error || null,
       cost_guard: result?.cost_guard || null,
     });
@@ -90,7 +94,10 @@ export async function routeCollection(request, config) {
 
   const dedup = new Map();
   for (const item of results) {
-    const key = String(item?.source_url || `${item?.source_name || 'source'}:${item?.source_item_id || ''}`).trim();
+    const sourceUrl = String(item?.source_url || '').trim();
+    const key = sourceUrl
+      ? canonicalSourceKey(sourceUrl)
+      : String(`${item?.source_name || 'source'}:${item?.source_item_id || ''}`).trim();
     if (key && !dedup.has(key)) dedup.set(key, item);
   }
   const uniqueResults = [...dedup.values()].slice(0, request.limit);
