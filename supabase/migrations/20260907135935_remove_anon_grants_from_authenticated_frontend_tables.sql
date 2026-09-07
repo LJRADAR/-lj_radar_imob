@@ -1,0 +1,15 @@
+revoke all privileges on table public.lj_profiles from anon;
+revoke all privileges on table public.lji_workspace_members from anon;
+revoke all privileges on table public.lji_buyers from anon;
+revoke all privileges on table public.lji_company_demands from anon;
+revoke all privileges on table public.lji_discovered_leads from anon;
+revoke all privileges on table public.lji_trade_intents from anon;
+revoke all privileges on table public.lji_workspace_settings from anon;
+revoke all privileges on table public.lji_registry_searches from anon;
+revoke all privileges on table public.lji_activity_log from anon;
+revoke all privileges on table public.lji_match_alerts from anon;
+revoke all privileges on table public.lj_v2_user_profiles from anon;
+revoke all privileges on table public.lj_v2_collector_runs from anon;
+revoke all privileges on table public.lj_v2_security_audit from anon;
+revoke all privileges on table public.lj_v2_sources from anon;
+revoke all privileges on table public.lj_v2_collector_source_profiles from anon;
