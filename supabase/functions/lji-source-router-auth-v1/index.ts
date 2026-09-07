@@ -1,9 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const FUNCTION_NAME = "lji-source-router-auth-v1";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const MAX_SKEW_MS = 120_000;
+const ROUTER_URL = "https://lji-source-router.onrender.com";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,28 @@ function fromBase64(value: string): Uint8Array | null {
   }
 }
 
+function toBase64(value: ArrayBuffer): string {
+  let raw = "";
+  for (const b of new Uint8Array(value)) raw += String.fromCharCode(b);
+  return btoa(raw);
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmac(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return toBase64(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)));
+}
+
 async function verifySignature(secret: string, timestamp: string, nonce: string, bodySha256: string, signatureB64: string) {
   const signature = fromBase64(signatureB64);
   if (!signature) return false;
@@ -49,6 +72,57 @@ async function verifySignature(secret: string, timestamp: string, nonce: string,
   );
   const message = `POST\n/collect\n${timestamp}\n${nonce}\n${bodySha256}`;
   return crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(message));
+}
+
+async function probeRouterAuth(secret: string) {
+  const probeBody = JSON.stringify({
+    source: "threads",
+    state_code: "XX",
+    city: "São Caetano do Sul",
+    transaction_type: "sale",
+    limit: 1,
+  });
+  const timestamp = String(Date.now());
+  const nonce = crypto.randomUUID();
+  const bodySha256 = await sha256(probeBody);
+  const signature = await hmac(secret, `POST\n/collect\n${timestamp}\n${nonce}\n${bodySha256}`);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(`${ROUTER_URL}/collect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-lji-auth-version": "hmac-sha256-v1",
+        "x-lji-timestamp": timestamp,
+        "x-lji-nonce": nonce,
+        "x-lji-signature": signature,
+      },
+      body: probeBody,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    const authVerified = response.status === 400 && data?.error === "state_not_supported";
+    return {
+      ok: authVerified,
+      auth_verified: authVerified,
+      router_http_status: response.status,
+      router_error: data?.error ?? null,
+      expected_after_auth: "state_not_supported",
+      collection_performed: false,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      auth_verified: false,
+      router_http_status: null,
+      router_error: error instanceof Error ? error.message : String(error),
+      collection_performed: false,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -64,6 +138,17 @@ Deno.serve(async (req) => {
       named_secret_available: Boolean(namedSecret()),
       auth_scheme: "hmac-sha256-v1",
       max_skew_ms: MAX_SKEW_MS,
+    });
+  }
+
+  if (body.action === "probe_router_auth") {
+    const secret = namedSecret();
+    if (!secret) return json({ ok: false, error: "verifier_secret_unavailable" }, 503);
+    return json({
+      function: FUNCTION_NAME,
+      version: VERSION,
+      auth_scheme: "hmac-sha256-v1",
+      ...(await probeRouterAuth(secret)),
     });
   }
 
