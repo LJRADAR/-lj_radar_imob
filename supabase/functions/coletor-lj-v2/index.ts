@@ -1,11 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const VERSION = "6.3.0";
+const VERSION = "6.4.0";
 const FUNCTION_NAME = "coletor-lj-v2";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const URL = String(Deno.env.get("SUPABASE_URL") ?? "").trim().replace(/\/+$/, "");
 const SERVICE = String(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
 const ANON = String(Deno.env.get("SUPABASE_ANON_KEY") ?? "").trim();
+const SUPPORTED_SOURCES = ["all", "threads", "olx", "instagram", "facebook", "telegram"];
+const SOURCE_FALLBACK: Record<string, string> = {
+  threads: "Threads público",
+  olx: "OLX Imóveis",
+  instagram: "Instagram público",
+  facebook: "Facebook público",
+  telegram: "Telegram público",
+};
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -225,12 +233,13 @@ async function createRun(args: {
     started_at: new Date().toISOString(),
     system_snapshot: {
       collector_version: VERSION,
-      strategy: "source_router_threads_official",
+      strategy: "source_router_multi_provider",
       source: args.source,
       external_search_engine: false,
+      providers: ["threads_api", "apify"],
       router_auth: "hmac-sha256-v1",
     },
-    metadata: { source_router: true, active_sources: ["threads"] },
+    metadata: { source_router: true, requested_source: args.source },
   }], { Prefer: "return=representation" });
   const run = Array.isArray(rows) ? rows[0] : null;
   if (!run?.id) throw new Error("collector_run_create_failed");
@@ -248,12 +257,19 @@ async function persistDiscovery(args: { item: any; runId: string; sourceId: stri
   const existing = Array.isArray(existingRows) ? existingRows[0] : null;
   const now = new Date().toISOString();
   const publishedAt = isoOrNull(args.item?.published_at);
+  const provider = args.item?.raw_quality?.apify === true
+    ? "apify"
+    : args.item?.raw_quality?.official_api === true
+      ? "official_api"
+      : "source_router";
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === "object" ? existing.metadata : {}),
     source_router: {
       source_name: text(args.item?.source_name),
       source_item_id: text(args.item?.source_item_id),
+      provider,
       official_api: args.item?.raw_quality?.official_api === true,
+      apify: args.item?.raw_quality?.apify === true,
       exact_city_or_zone: args.item?.raw_quality?.exact_city_or_zone === true,
       owner_signal: args.item?.raw_quality?.owner_signal === true,
       collected_at: now,
@@ -387,16 +403,18 @@ Deno.serve(async (req: Request) => {
       ok: true,
       function: FUNCTION_NAME,
       version: VERSION,
-      strategy: "source_router_threads_official",
+      strategy: "source_router_multi_provider",
       external_search_engine: false,
       auth_scheme: "hmac-sha256-v1",
       source_router_url_configured: Boolean(cfg.routerUrl),
       router_auth_signing_configured: Boolean(secret),
       router_reachable: Boolean(remote),
       router_version: text(remote?.version),
-      active_sources: ["threads"],
-      disabled_sources: ["mercadolivre"],
-      source_readiness: remote?.sources ?? { threads: "unknown", mercadolivre: "disabled" },
+      supported_sources: SUPPORTED_SOURCES.filter((s) => s !== "all"),
+      ready_sources: Array.isArray(remote?.ready_sources) ? remote.ready_sources : [],
+      disabled_sources: Array.isArray(remote?.disabled_sources) ? remote.disabled_sources : ["mercadolivre"],
+      source_readiness: remote?.sources ?? {},
+      apify_cost_guard: remote?.apify_cost_guard ?? null,
       collection_enabled: Boolean(cfg.routerUrl && secret && remote?.collection_ready === true),
     });
   }
@@ -423,7 +441,7 @@ Deno.serve(async (req: Request) => {
   if (stateCode !== "SP" || !city || !transactionType) {
     return json({ ok: false, error: "invalid_request", required: ["state_code=SP", "city", "transaction_type"] }, 400);
   }
-  if (!["all", "threads"].includes(source)) {
+  if (!SUPPORTED_SOURCES.includes(source)) {
     return json({
       ok: false,
       error: source === "mercadolivre" ? "source_temporarily_disabled_pending_official_access" : "source_not_supported",
@@ -465,7 +483,7 @@ Deno.serve(async (req: Request) => {
     for (const item of results) {
       position += 1;
       try {
-        const itemSourceName = text(item?.source_name) ?? "Threads público";
+        const itemSourceName = text(item?.source_name) ?? SOURCE_FALLBACK[source] ?? "Web aberta com contato";
         let sourceId = sourceIdCache.get(itemSourceName);
         if (sourceId === undefined) {
           sourceId = await sourceIdByName(itemSourceName);
