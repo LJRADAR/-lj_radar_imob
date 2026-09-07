@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractProfileWithClaude, updateBuyerFromExplicit, fetchExistingProfile } from "../_shared/sales-match-profile.ts";
 
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
+const WORKSPACE_RESOLUTION = "phone_number_id_with_legacy_empty_registry_fallback";
 const digits = (v: unknown) => String(v || "").replace(/\D/g, "");
 const samePhone = (a: unknown, b: unknown) => {
   const x = digits(a), y = digits(b);
@@ -64,6 +65,46 @@ async function insertEventOnce(admin: any, row: any) {
   if (!error) return true;
   if (String(error.code || "") === "23505") return false;
   throw error;
+}
+
+async function resolveWorkspaceForChange(admin: any, change: any, legacyWorkspace: string) {
+  const phoneNumberId = String(change?.value?.metadata?.phone_number_id || "").trim();
+
+  if (phoneNumberId) {
+    const exact = await admin
+      .from("lji_whatsapp_accounts")
+      .select("workspace_id,phone_number_id")
+      .eq("phone_number_id", phoneNumberId)
+      .eq("is_active", true)
+      .maybeSingle();
+    throwIfError(exact.error, "resolveWorkspace exact account");
+    if (exact.data?.workspace_id) {
+      return {
+        workspace: String(exact.data.workspace_id),
+        phone_number_id: phoneNumberId,
+        method: "phone_number_id_registry",
+      };
+    }
+  }
+
+  const registry = await admin
+    .from("lji_whatsapp_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true);
+  throwIfError(registry.error, "resolveWorkspace registry count");
+  const activeAccounts = Number(registry.count || 0);
+
+  if (activeAccounts === 0 && legacyWorkspace) {
+    return {
+      workspace: legacyWorkspace,
+      phone_number_id: phoneNumberId || null,
+      method: "legacy_env_empty_registry",
+    };
+  }
+
+  if (!phoneNumberId) throw new Error("whatsapp_phone_number_id_missing");
+  if (activeAccounts > 0) throw new Error(`whatsapp_account_mapping_missing:${phoneNumberId}`);
+  throw new Error("whatsapp_account_registry_empty_and_legacy_workspace_missing");
 }
 
 async function resolveLead(admin: any, workspace: string, phone: string) {
@@ -223,7 +264,7 @@ async function extractMatchProfile(admin: any, workspace: string, phone: string,
   return { profile, engine, updated_fields: updatedFields };
 }
 
-async function processMessage(admin: any, workspace: string, change: any, m: any) {
+async function processMessage(admin: any, workspace: string, change: any, m: any, phoneNumberId: string | null, workspaceResolution: string) {
   const messageId = String(m?.id || "").trim();
   const from = digits(m?.from);
   if (!messageId || !from) return { skipped: true, reason: "missing_message_identity" };
@@ -244,6 +285,8 @@ async function processMessage(admin: any, workspace: string, change: any, m: any
     entity_id: from,
     details: {
       phone: from, from, text, contact_name: name, message_id: messageId, type: m.type, timestamp: m.timestamp,
+      phone_number_id: phoneNumberId,
+      workspace_resolution: workspaceResolution,
       linked_entity_type: lead?.entity_type || null, linked_entity_id: lead?.entity_id || null,
     },
   });
@@ -252,7 +295,7 @@ async function processMessage(admin: any, workspace: string, change: any, m: any
     await insertEventOnce(admin, {
       workspace_id: workspace, user_id: null, event_type: "whatsapp_processing_completed",
       entity_type: "whatsapp", entity_id: from,
-      details: { phone: from, message_id: messageId, linked: false, version: VERSION },
+      details: { phone: from, message_id: messageId, phone_number_id: phoneNumberId, workspace_resolution: workspaceResolution, linked: false, version: VERSION },
     });
     return { ok: true, linked: false };
   }
@@ -312,7 +355,10 @@ async function processMessage(admin: any, workspace: string, change: any, m: any
   await insertEventOnce(admin, {
     workspace_id: workspace, user_id: null, event_type: "whatsapp_processing_completed",
     entity_type: "whatsapp", entity_id: from,
-    details: { phone: from, message_id: messageId, linked: true, linked_entity_type: lead.entity_type, linked_entity_id: lead.entity_id, version: VERSION },
+    details: {
+      phone: from, message_id: messageId, phone_number_id: phoneNumberId, workspace_resolution: workspaceResolution,
+      linked: true, linked_entity_type: lead.entity_type, linked_entity_id: lead.entity_id, version: VERSION,
+    },
   });
   return { ok: true, linked: true };
 }
@@ -323,7 +369,15 @@ Deno.serve(async (req) => {
   if (req.method === "GET") {
     const u = new URL(req.url);
     if (u.searchParams.get("action") === "health") {
-      return new Response(JSON.stringify({ ok: true, function: "lji-whatsapp-webhook-v1", version: VERSION, retry_safe: true, idempotent: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({
+        ok: true,
+        function: "lji-whatsapp-webhook-v1",
+        version: VERSION,
+        retry_safe: true,
+        idempotent: true,
+        workspace_resolution: WORKSPACE_RESOLUTION,
+        workspace_registry: "lji_whatsapp_accounts",
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (u.searchParams.get("hub.mode") === "subscribe" && u.searchParams.get("hub.verify_token") === verify) {
       return new Response(u.searchParams.get("hub.challenge") || "", { status: 200 });
@@ -345,20 +399,33 @@ Deno.serve(async (req) => {
     try { payload = JSON.parse(raw); }
     catch { return new Response("invalid_json", { status: 400 }); }
 
-    const workspace = Deno.env.get("LJI_WORKSPACE_ID") || "";
-    if (!workspace) return new Response("workspace_not_configured", { status: 503 });
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     if (!supabaseUrl || !serviceRole) return new Response("supabase_not_configured", { status: 503 });
     const admin = createClient(supabaseUrl, serviceRole);
+    const legacyWorkspace = Deno.env.get("LJI_WORKSPACE_ID") || "";
 
     let failed = false;
     let processed = 0;
     for (const entry of payload?.entry || []) {
       for (const change of entry?.changes || []) {
+        let routing: { workspace: string; phone_number_id: string | null; method: string };
+        try {
+          routing = await resolveWorkspaceForChange(admin, change, legacyWorkspace);
+        } catch (e) {
+          console.error("webhook workspace resolution failed", e);
+          return new Response(JSON.stringify({
+            ok: false,
+            retry: true,
+            error: "workspace_resolution_failed",
+            version: VERSION,
+            phone_number_id_present: Boolean(String(change?.value?.metadata?.phone_number_id || "").trim()),
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+
         for (const m of change?.value?.messages || []) {
           try {
-            const result = await processMessage(admin, workspace, change, m);
+            const result = await processMessage(admin, routing.workspace, change, m, routing.phone_number_id, routing.method);
             if (!result?.skipped) processed++;
           } catch (e) {
             failed = true;
@@ -367,9 +434,20 @@ Deno.serve(async (req) => {
             console.error(`webhook processing failed for ${messageId}`, e);
             try {
               await admin.from("lji_activity_log").insert({
-                workspace_id: workspace, user_id: null, event_type: "whatsapp_processing_failed",
-                entity_type: "whatsapp", entity_id: from || "unknown",
-                details: { phone: from || null, message_id: messageId || null, error: String((e as Error)?.message || e).slice(0, 500), version: VERSION, retry_expected: true },
+                workspace_id: routing.workspace,
+                user_id: null,
+                event_type: "whatsapp_processing_failed",
+                entity_type: "whatsapp",
+                entity_id: from || "unknown",
+                details: {
+                  phone: from || null,
+                  message_id: messageId || null,
+                  phone_number_id: routing.phone_number_id,
+                  workspace_resolution: routing.method,
+                  error: String((e as Error)?.message || e).slice(0, 500),
+                  version: VERSION,
+                  retry_expected: true,
+                },
               });
             } catch (logErr) {
               console.error("failed to persist webhook failure", logErr);
