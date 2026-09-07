@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateRequest } from '../src/router.js';
+import { routeCollection, validateRequest } from '../src/router.js';
 import { locationMatchesTarget } from '../src/normalize.js';
 
 test('accepts São Caetano core target', () => {
@@ -27,6 +27,23 @@ test('keeps Mercado Livre disabled until official access is proven', () => {
   const result = validateRequest({ source: 'mercadolivre', state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
   assert.equal(result.ok, false);
   assert.equal(result.error, 'source_temporarily_disabled_pending_official_access');
+});
+
+test('all mode does not call unconfigured sources', async () => {
+  const validation = validateRequest({ source: 'all', state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
+  assert.equal(validation.ok, true);
+  const result = await routeCollection(validation.request, {
+    threadsToken: '',
+    apifyToken: '',
+    apifyTasks: {},
+    requestTimeoutMs: 3000,
+    apifyTimeoutSecs: 20,
+    apifyMaxChargeUsd: 0.25,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 'not_configured');
+  assert.equal(result.error, 'no_source_configured');
+  assert.deepEqual(result.source_report, []);
 });
 
 test('rejects unsupported source', () => {
