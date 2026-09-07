@@ -47,13 +47,11 @@ const PROFILE_FIELDS = [
   "timeline_days",
 ] as const;
 
-/** Trim + cap length; returns null for empty/non-string input. */
 export function clean(v: unknown, max = 120): string | null {
   const s = String(v ?? "").trim();
   return s ? s.slice(0, max) : null;
 }
 
-/** Coerce to a finite, positive number, or null. */
 export function num(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -77,7 +75,6 @@ export function parseMoney(raw: string): number | null {
   return null;
 }
 
-/** Regex-only fallback used when there's no API key or the model call fails. */
 export function heuristicProfile(transcript: string, lead: any): Profile {
   const t = transcript.toLowerCase();
   const explicit: string[] = [];
@@ -185,13 +182,6 @@ export function heuristicProfile(transcript: string, lead: any): Profile {
   };
 }
 
-/**
- * Sanitizes/validates a raw (untrusted) object — typically parsed straight
- * from the model's JSON response — into a well-typed Profile. This is the
- * single place that enforces types, ranges and string lengths before a
- * profile is stored or used to update lji_buyers, regardless of which
- * caller (manual or automatic) produced it.
- */
 export function normalizeProfile(p: any): Profile {
   const allowedTx = ["sale", "rent", "both"];
   const allowedRole = ["buyer", "seller", "unknown"];
@@ -241,12 +231,6 @@ function conversationTranscript(rows: ConversationRow[], limit = 14000): string 
     .slice(-limit);
 }
 
-/**
- * Runs the extraction: tries Claude first (if ANTHROPIC_API_KEY is set),
- * always falls back to the regex heuristic on any failure — missing key,
- * HTTP error, or malformed JSON. The returned profile is ALWAYS the output
- * of `normalizeProfile`, so callers never need to sanitize it themselves.
- */
 export async function extractProfileWithClaude(
   rows: ConversationRow[],
   lead: any
@@ -286,12 +270,6 @@ export async function extractProfileWithClaude(
   }
 }
 
-/**
- * Applies the explicit fields of a Profile onto lji_buyers. Only writes
- * fields the client actually stated (per `profile.explicit_fields`), and
- * throws on a Supabase error instead of silently ignoring it — the caller
- * decides how to handle/report the failure.
- */
 export async function updateBuyerFromExplicit(
   admin: any,
   workspace: string,
@@ -322,31 +300,25 @@ export async function updateBuyerFromExplicit(
   return { updated: true, fields: Object.keys(update) };
 }
 
-/**
- * Fetches the existing cadastral profile for a lead (buyer or buyer_intent)
- * so it can be handed to the model as context — mirrors what the frontend's
- * `ljiMatchProfileBase` sends on the manual path, so the automatic path gets
- * the same context instead of extracting "in the dark".
- * Returns null for any other entity type (e.g. opportunity/seller).
- */
 export async function fetchExistingProfile(admin: any, workspace: string, lead: { entity_type: string; entity_id: string }) {
   if (lead.entity_type === "buyer") {
-    const { data: b } = await admin
+    const { data: b, error } = await admin
       .from("lji_buyers")
-      .select("name,city,neighborhood,type,transaction_type,budget,beds,parking,area_min,urgency,contact,source")
+      .select("name,city,neighborhood,property_type,transaction_type,budget_max,bedrooms_min,parking_min,area_min,urgency,contact,source")
       .eq("workspace_id", workspace)
       .eq("id", lead.entity_id)
       .maybeSingle();
+    if (error) throw error;
     if (!b) return null;
     return {
       name: b.name || "",
       city: b.city || "",
       neighborhood: b.neighborhood || "",
-      type: b.type || "",
+      type: b.property_type || "",
       transaction_type: b.transaction_type || "",
-      budget: Number(b.budget || 0),
-      beds: Number(b.beds || 0),
-      parking: Number(b.parking || 0),
+      budget: Number(b.budget_max || 0),
+      beds: Number(b.bedrooms_min || 0),
+      parking: Number(b.parking_min || 0),
       area_min: Number(b.area_min || 0),
       urgency: Number(b.urgency || 2),
       contact: b.contact || "",
@@ -354,12 +326,13 @@ export async function fetchExistingProfile(admin: any, workspace: string, lead: 
     };
   }
   if (lead.entity_type === "buyer_intent") {
-    const { data: i } = await admin
+    const { data: i, error } = await admin
       .from("lji_buyer_intents")
       .select("person_name,title,city,region,neighborhood,property_type,transaction_type,budget_max,bedrooms_min,parking_min,area_min,urgency,contact,source_name")
       .eq("workspace_id", workspace)
       .eq("id", lead.entity_id)
       .maybeSingle();
+    if (error) throw error;
     if (!i) return null;
     return {
       name: i.person_name || i.title || "",
