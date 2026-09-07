@@ -36,17 +36,21 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     if (req.method === 'GET' && url.pathname === '/health') {
+      const sources = {
+        mercadolivre: config.mercadoLivreToken ? 'ready' : 'needs_token',
+        threads: config.threadsToken ? 'ready' : 'needs_token',
+      };
       return send(res, 200, {
         ok: true,
         service: 'lji-source-router',
-        version: '1.0.0',
+        version: '1.1.0',
         configured: {
           router_token: Boolean(config.routerToken),
           mercadolivre: Boolean(config.mercadoLivreToken),
+          threads: Boolean(config.threadsToken),
         },
-        sources: {
-          mercadolivre: config.mercadoLivreToken ? 'ready' : 'needs_token',
-        },
+        collection_ready: Boolean(config.routerToken && (config.mercadoLivreToken || config.threadsToken)),
+        sources,
       });
     }
     if (req.method !== 'POST' || url.pathname !== '/collect') return send(res, 404, { ok: false, error: 'not_found' });
