@@ -15,6 +15,20 @@ test('accepts explicit Threads source', () => {
   assert.equal(result.request.source, 'threads');
 });
 
+test('accepts Apify-backed source names', () => {
+  for (const source of ['olx', 'instagram', 'facebook', 'telegram']) {
+    const result = validateRequest({ source, state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
+    assert.equal(result.ok, true);
+    assert.equal(result.request.source, source);
+  }
+});
+
+test('keeps Mercado Livre disabled until official access is proven', () => {
+  const result = validateRequest({ source: 'mercadolivre', state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'source_temporarily_disabled_pending_official_access');
+});
+
 test('rejects unsupported source', () => {
   const result = validateRequest({ source: 'unknown', state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
   assert.equal(result.ok, false);
