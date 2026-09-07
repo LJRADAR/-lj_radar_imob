@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
-const VERSION = "4.0.0";
+const VERSION = "4.1.0";
 const FUNCTION_NAME = "verificador-quinto-lj";
 const COLLECTOR_SECRET_KEY = "radar_lj_v2_collector";
 const URL = Deno.env.get("SUPABASE_URL") || "";
@@ -32,6 +32,10 @@ function namedSecrets() {
   }
 }
 
+function signingSecret() {
+  return clean(namedSecrets()[COLLECTOR_SECRET_KEY]);
+}
+
 function bearer(req: Request) {
   const raw = clean(req.headers.get("Authorization"));
   return raw.toLowerCase().startsWith("bearer ") ? raw.slice(7).trim() : "";
@@ -46,7 +50,7 @@ async function authContext(req: Request, sb: any) {
 
   const incomingApiKey = clean(req.headers.get("apikey"));
   const incomingBearer = bearer(req);
-  const named = clean(namedSecrets()[COLLECTOR_SECRET_KEY]);
+  const named = signingSecret();
   if (named && (incomingApiKey === named || incomingBearer === named)) {
     return { ok: true, mode: "internal", userId: null };
   }
@@ -165,6 +169,76 @@ async function persist(sb: any, c: any, p: any) {
   return { attempted: true, ok: !error, error: error?.message || null };
 }
 
+async function routerUrl(sb: any) {
+  const env = clean(Deno.env.get("LJI_SOURCE_ROUTER_URL"));
+  if (env) return env.replace(/\/+$/, "");
+  const { data } = await sb.from("lji_internal_secrets").select("secret").eq("key", "source_router_url").maybeSingle();
+  return clean(data?.secret).replace(/\/+$/, "");
+}
+
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function base64(bytes: ArrayBuffer) {
+  let binary = "";
+  for (const b of new Uint8Array(bytes)) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+async function hmacSignature(secret: string, message: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return base64(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)));
+}
+
+async function callRouterVerifier(sb: any, candidate: any) {
+  const base = await routerUrl(sb);
+  const secret = signingSecret();
+  if (!base || !secret) {
+    return { ok: true, status: "inconclusive", confidence: 0, approved_for_pipeline: false, provider: "none", reason: "source_router_not_configured", results_checked: 0 };
+  }
+
+  const path = "/verify-quinto";
+  const rawBody = JSON.stringify({ candidate });
+  const bodySha = await sha256(rawBody);
+  const timestamp = String(Date.now());
+  const nonce = crypto.randomUUID();
+  const signature = await hmacSignature(secret, `POST\n${path}\n${timestamp}\n${nonce}\n${bodySha}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45_000);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-lji-auth-version": "hmac-sha256-v1",
+        "x-lji-timestamp": timestamp,
+        "x-lji-nonce": nonce,
+        "x-lji-signature": signature,
+      },
+      body: rawBody,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok !== true) {
+      return { ok: true, status: "inconclusive", confidence: 0, approved_for_pipeline: false, provider: "source_router", reason: `source_router_${response.status}`, results_checked: 0 };
+    }
+    return data;
+  } catch (e) {
+    const reason = e instanceof Error && e.name === "AbortError" ? "source_router_timeout" : "source_router_verifier_failed";
+    return { ok: true, status: "inconclusive", confidence: 0, approved_for_pipeline: false, provider: "source_router", reason, results_checked: 0 };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
@@ -175,15 +249,19 @@ Deno.serve(async (req) => {
     const action = clean(body.action || "verify").toLowerCase();
 
     if (action === "health") {
+      const base = await routerUrl(sb);
       return json({
         ok: true,
         function: FUNCTION_NAME,
         version: VERSION,
         candidate_hydration_from_database: true,
         object_authorization: true,
-        provider: "none",
+        provider: "source_router_apify_positive_only",
         external_search_engine: false,
-        direct_quinto_verification: "pending",
+        source_router_configured: Boolean(base),
+        router_auth_signing_configured: Boolean(signingSecret()),
+        positive_match_only: true,
+        absence_means: "inconclusive",
         fail_closed: true,
       });
     }
@@ -211,6 +289,7 @@ Deno.serve(async (req) => {
         searches_planned: 0,
         searches_run: 0,
         searches_failed: 0,
+        results_checked: 1,
       };
       p.database_write = await persist(sb, c, p);
       return json({ ...p, version: VERSION });
@@ -219,23 +298,56 @@ Deno.serve(async (req) => {
     const identifying = [c.address, c.cep, c.neighborhood, c.area_m2, c.bedrooms, c.parking_spaces, c.price]
       .filter((x) => x !== null && x !== undefined && String(x).trim() !== "");
 
+    if (identifying.length < 3 || !c.city || !["sale", "rent"].includes(c.transaction_type)) {
+      const p: any = {
+        ok: true,
+        status: "inconclusive",
+        approved_for_pipeline: false,
+        confidence: 0,
+        reason: "insufficient_identifiers",
+        strong_match_evidence: false,
+        best_match: null,
+        matches: [],
+        failed_queries: [],
+        provider: "none",
+        external_search_engine: false,
+        searches_planned: 0,
+        searches_run: 0,
+        searches_failed: 0,
+        results_checked: 0,
+        generic_results_ignored: 0,
+      };
+      p.database_write = await persist(sb, c, p);
+      return json({ ...p, version: VERSION });
+    }
+
+    const remote: any = await callRouterVerifier(sb, c);
+    const found = remote.status === "found_on_quintoandar";
+    const bestMatch = found ? {
+      link: clean(remote.match_url) || null,
+      external_id: clean(remote.match_id) || null,
+      match_score: num(remote.confidence) || 0,
+      match_reasons: Array.isArray(remote.evidence) ? remote.evidence : [],
+    } : null;
+
     const p: any = {
       ok: true,
-      status: "inconclusive",
+      status: found ? "found_on_quintoandar" : "inconclusive",
       approved_for_pipeline: false,
-      confidence: null,
-      reason: identifying.length < 3 ? "insufficient_identifiers" : "direct_quinto_provider_pending",
-      strong_match_evidence: false,
-      best_match: null,
-      matches: [],
+      confidence: found ? (num(remote.confidence) || 0) : Math.min(69, num(remote.confidence) || 0),
+      reason: clean(remote.reason) || (found ? "strong_positive_match" : "verification_inconclusive"),
+      strong_match_evidence: found,
+      best_match: bestMatch,
+      matches: bestMatch ? [bestMatch] : [],
       failed_queries: [],
-      provider: "none",
+      provider: clean(remote.provider) || "source_router",
       external_search_engine: false,
-      searches_planned: 0,
-      searches_run: 0,
+      searches_planned: 1,
+      searches_run: 1,
       searches_failed: 0,
-      results_checked: 0,
+      results_checked: Number(remote.results_checked || 0),
       generic_results_ignored: 0,
+      positive_match_only: true,
     };
     p.database_write = await persist(sb, c, p);
     return json({ ...p, version: VERSION });
