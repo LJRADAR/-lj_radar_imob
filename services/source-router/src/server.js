@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const MAX_BODY_BYTES = 128000;
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
@@ -89,11 +89,25 @@ async function authorized(req, rawBody) {
   }
 }
 
+function apifySourceStatus(source) {
+  if (!config.apifyToken) return 'needs_apify_token';
+  if (!config.apifyTasks?.[source]) return 'needs_apify_task';
+  return 'ready_via_apify';
+}
+
 function healthPayload() {
   const sources = {
-    threads: config.threadsToken ? 'ready' : 'needs_token',
+    threads: config.threadsToken ? 'ready_official_api' : 'needs_token',
+    olx: apifySourceStatus('olx'),
+    instagram: apifySourceStatus('instagram'),
+    facebook: apifySourceStatus('facebook'),
+    telegram: apifySourceStatus('telegram'),
     mercadolivre: 'disabled_pending_official_access',
   };
+  const readySources = Object.entries(sources)
+    .filter(([, status]) => status === 'ready_official_api' || status === 'ready_via_apify')
+    .map(([source]) => source);
+
   return {
     ok: true,
     service: 'lji-source-router',
@@ -101,11 +115,16 @@ function healthPayload() {
     auth_scheme: 'hmac-sha256-v1',
     configured: {
       auth_verifier: Boolean(config.authVerifierUrl),
-      threads: Boolean(config.threadsToken),
-      mercadolivre: false,
+      threads_token: Boolean(config.threadsToken),
+      apify_token: Boolean(config.apifyToken),
+      apify_tasks: Object.fromEntries(Object.entries(config.apifyTasks || {}).map(([key, value]) => [key, Boolean(value)])),
     },
-    collection_ready: Boolean(config.authVerifierUrl && config.threadsToken),
-    active_sources: ['threads'],
+    apify_cost_guard: {
+      max_total_charge_usd_per_run: config.apifyMaxChargeUsd,
+      timeout_seconds: config.apifyTimeoutSecs,
+    },
+    collection_ready: Boolean(config.authVerifierUrl && readySources.length > 0),
+    ready_sources: readySources,
     disabled_sources: ['mercadolivre'],
     sources,
   };
