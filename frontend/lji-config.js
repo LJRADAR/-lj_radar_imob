@@ -20,15 +20,24 @@ window.LJI_CONFIG = {
   ]
 };
 
-// Camada pequena e isolada que alinha Match/Dashboard/Pipeline aos gates do backend.
-// É carregada somente depois que app-core.js/app-backend.js já definiram as funções,
-// evitando reescrever o arquivo principal e reduzindo risco de regressão.
+// Camadas pequenas e isoladas carregadas depois que app-core.js/app-backend.js
+// já definiram as funções. Evita reescrever o arquivo principal e reduz regressão.
 window.addEventListener('load', () => {
-  if (document.querySelector('script[data-lji-quality-gates]')) return;
-  const script = document.createElement('script');
-  script.src = 'quality-gates.js?v=20260907-2';
-  script.async = true;
-  script.dataset.ljiQualityGates = '1';
-  script.onerror = () => console.error('LJ Radar: quality-gates.js não carregou.');
-  document.head.appendChild(script);
+  if (!document.querySelector('script[data-lji-quality-gates]')) {
+    const quality = document.createElement('script');
+    quality.src = 'quality-gates.js?v=20260907-2';
+    quality.async = true;
+    quality.dataset.ljiQualityGates = '1';
+    quality.onerror = () => console.error('LJ Radar: quality-gates.js não carregou.');
+    document.head.appendChild(quality);
+  }
+
+  if (!document.querySelector('script[data-lji-access-contract]')) {
+    const access = document.createElement('script');
+    access.src = 'access-contract.js?v=20260907-1';
+    access.async = true;
+    access.dataset.ljiAccessContract = '1';
+    access.onerror = () => console.error('LJ Radar: access-contract.js não carregou.');
+    document.head.appendChild(access);
+  }
 });
