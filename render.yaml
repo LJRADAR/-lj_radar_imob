@@ -10,11 +10,23 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: LJI_SOURCE_ROUTER_TOKEN
-        generateValue: true
-      - key: MERCADOLIVRE_ACCESS_TOKEN
+      - key: LJI_SOURCE_ROUTER_AUTH_URL
         sync: false
       - key: THREADS_ACCESS_TOKEN
         sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: APIFY_TASK_OLX
+        sync: false
+      - key: APIFY_TASK_INSTAGRAM
+        sync: false
+      - key: APIFY_TASK_FACEBOOK
+        sync: false
+      - key: APIFY_TASK_TELEGRAM
+        sync: false
+      - key: APIFY_MAX_CHARGE_USD
+        value: "0.25"
+      - key: APIFY_TIMEOUT_SECS
+        value: "35"
       - key: SOURCE_REQUEST_TIMEOUT_MS
-        value: "9000"
+        value: "40000"
