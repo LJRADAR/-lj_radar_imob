@@ -29,7 +29,17 @@ function normalizeText(value) {
 }
 
 function numberOrNull(value) {
-  const n = Number(value);
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const raw = String(value).trim().replace(/[^0-9,.-]/g, '');
+  if (!raw) return null;
+  let normalized = raw;
+  const comma = normalized.lastIndexOf(',');
+  const dot = normalized.lastIndexOf('.');
+  if (comma > dot) normalized = normalized.replace(/\./g, '').replace(',', '.');
+  else if (dot > comma) normalized = normalized.replace(/,/g, '');
+  else normalized = normalized.replace(/,/g, '.');
+  const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -60,6 +70,28 @@ function cityMatches(expected, actual) {
   return false;
 }
 
+function normalizePropertyType(value) {
+  const n = normalizeText(value);
+  if (!n) return null;
+  if (/\b(apartamento|apartamentos|apto|apartment)\b/.test(n)) return 'Apartamento';
+  if (/\b(casa|casas|sobrado|sobrados|house|home)\b/.test(n)) return 'Casa';
+  if (/\b(cobertura|coberturas|penthouse)\b/.test(n)) return 'Cobertura';
+  if (/\b(studio|studios|kitnet|kitnets|flat)\b/.test(n)) return 'Studio';
+  return text(value);
+}
+
+function propertyMetric(properties, labels) {
+  if (!Array.isArray(properties)) return null;
+  const wanted = labels.map(normalizeText);
+  for (const entry of properties) {
+    const name = normalizeText(entry?.name ?? entry?.label ?? entry?.key);
+    if (!name || !wanted.some((label) => name === label || name.includes(label))) continue;
+    const value = numberOrNull(entry?.value ?? entry?.values?.[0]);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
 function olxSearchUrl(request) {
   const citySlug = OLX_CITY_SLUGS[normalizeText(request.city)];
   if (!citySlug) return null;
@@ -84,9 +116,6 @@ function buildTaskInput(request, source, maxItems) {
     };
   }
 
-  // Social Tasks are intentionally configured in Apify Console with curated
-  // public search/channel defaults. lj_request is supplied for traceability;
-  // Router-side qualification remains mandatory before promotion.
   return {
     lj_request: {
       state_code: request.state_code,
@@ -108,12 +137,24 @@ function normalizeItem(item, request, source) {
   const actualCity = text(first(item, ['city', 'locationCity', 'municipality']));
   if (source === 'olx' && (!actualCity || !cityMatches(request.city, actualCity))) return null;
   const city = actualCity || request.city;
-  const neighborhood = text(first(item, ['neighborhood', 'bairro', 'district']));
+  const neighborhood = text(first(item, ['neighborhood', 'neighbourhood', 'bairro', 'district']));
   const publishedAt = text(first(item, ['published_at', 'publishedAt', 'postedAt', 'timestamp', 'date', 'createdAt', 'takenAtIso']));
   const seller = text(nested(item, ['seller.name', 'seller.username', 'owner.username', 'owner.fullName']))
     || text(first(item, ['sellerName', 'username', 'ownerName', 'author', 'ownerUsername']));
   const sellerType = text(nested(item, ['seller.type'])) || text(first(item, ['sellerType', 'accountType']));
   const sourceItemId = text(first(item, ['source_item_id', 'id', 'postId', 'listingId', 'shortcode', 'shortCode'])) || url;
+  const properties = Array.isArray(item?.properties) ? item.properties : [];
+  const images = Array.isArray(item?.photos) ? item.photos : Array.isArray(item?.images) ? item.images : [];
+  const category = text(first(item, ['property_type', 'propertyType', 'type', 'categoryName', 'category']));
+
+  const areaM2 = numberOrNull(first(item, ['area_m2', 'areaM2', 'area', 'floorSize']))
+    ?? propertyMetric(properties, ['Área útil', 'Area util', 'Área', 'Area', 'Metragem']);
+  const bedrooms = numberOrNull(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
+    ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios']);
+  const bathrooms = numberOrNull(first(item, ['bathrooms', 'bathroomCount']))
+    ?? propertyMetric(properties, ['Banheiros', 'Banheiro']);
+  const parkingSpaces = numberOrNull(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
+    ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem']);
 
   return {
     source_name: SOURCE_LABELS[source] || `Apify ${source}`,
@@ -123,22 +164,29 @@ function normalizeItem(item, request, source) {
     description,
     price: numberOrNull(first(item, ['price', 'amount', 'value'])),
     currency: text(first(item, ['currency', 'currency_id'])) || 'BRL',
-    state_code: 'SP',
+    state_code: text(first(item, ['state', 'state_code', 'stateCode'])) || 'SP',
     city,
     neighborhood,
     transaction_type: request.transaction_type,
-    property_type: request.property_type_code || text(first(item, ['property_type', 'propertyType', 'type', 'categoryName'])),
+    property_type: normalizePropertyType(request.property_type_code) || normalizePropertyType(category),
     published_at: publishedAt,
     seller_id: text(nested(item, ['seller.id', 'owner.id'])) || seller,
     seller_nickname: seller,
+    seller_type: sellerType,
+    area_m2: areaM2,
+    bedrooms: bedrooms !== null ? Math.max(0, Math.trunc(bedrooms)) : null,
+    bathrooms: bathrooms !== null ? Math.max(0, Math.trunc(bathrooms)) : null,
+    parking_spaces: parkingSpaces !== null ? Math.max(0, Math.trunc(parkingSpaces)) : null,
+    postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
+    main_image_url: text(first(item, ['thumbnailUrl', 'imageUrl', 'mainImageUrl'])) || text(images[0]),
     attributes: {
       phone: text(first(item, ['phone', 'telephone', 'contactPhone'])),
       whatsapp: text(first(item, ['whatsapp', 'whatsappUrl'])),
       seller_type: sellerType,
-      phone_available: first(item, ['phoneAvailable', 'hasPhone']) ?? null,
+      phone_available: nested(item, ['seller.phoneAvailable']) ?? first(item, ['phoneAvailable', 'hasPhone']) ?? null,
       postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
       category_name: text(first(item, ['categoryName', 'category'])),
-      properties: Array.isArray(item?.properties) ? item.properties : [],
+      properties,
     },
     raw_quality: {
       apify: true,
