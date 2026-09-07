@@ -1,9 +1,12 @@
 import http from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
+const MAX_BODY_BYTES = 128000;
+const MAX_SKEW_MS = 120000;
+const seenNonces = new Map();
 
 function send(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -15,23 +18,75 @@ function send(res, status, payload) {
   res.end(body);
 }
 
-function authorized(req) {
-  if (!config.routerToken) return false;
-  const raw = String(req.headers.authorization || '');
-  const token = raw.startsWith('Bearer ') ? raw.slice(7).trim() : '';
-  if (!token) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(config.routerToken);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-async function readJson(req) {
+async function readRawBody(req) {
   let raw = '';
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 128000) throw new Error('request_too_large');
+    if (Buffer.byteLength(raw) > MAX_BODY_BYTES) throw new Error('request_too_large');
   }
-  return raw ? JSON.parse(raw) : {};
+  return raw;
+}
+
+function pruneNonces(now) {
+  for (const [nonce, expiresAt] of seenNonces.entries()) {
+    if (expiresAt <= now) seenNonces.delete(nonce);
+  }
+}
+
+function authHeaders(req) {
+  return {
+    version: String(req.headers['x-lji-auth-version'] || '').trim(),
+    timestamp: String(req.headers['x-lji-timestamp'] || '').trim(),
+    nonce: String(req.headers['x-lji-nonce'] || '').trim(),
+    signature: String(req.headers['x-lji-signature'] || '').trim(),
+  };
+}
+
+async function authorized(req, rawBody) {
+  if (!config.authVerifierUrl) return { ok: false, error: 'auth_verifier_not_configured' };
+
+  const headers = authHeaders(req);
+  if (headers.version !== 'hmac-sha256-v1') return { ok: false, error: 'auth_version_invalid' };
+  if (!headers.timestamp || !headers.nonce || !headers.signature) return { ok: false, error: 'auth_headers_missing' };
+
+  const timestamp = Number(headers.timestamp);
+  const now = Date.now();
+  if (!Number.isFinite(timestamp) || Math.abs(now - timestamp) > MAX_SKEW_MS) {
+    return { ok: false, error: 'auth_timestamp_invalid' };
+  }
+  if (headers.nonce.length < 16 || headers.nonce.length > 128) {
+    return { ok: false, error: 'auth_nonce_invalid' };
+  }
+
+  pruneNonces(now);
+  if (seenNonces.has(headers.nonce)) return { ok: false, error: 'auth_replay_detected' };
+
+  const bodySha256 = createHash('sha256').update(rawBody).digest('hex');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.min(config.requestTimeoutMs, 10000));
+  try {
+    const response = await fetch(config.authVerifierUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timestamp: headers.timestamp,
+        nonce: headers.nonce,
+        signature: headers.signature,
+        body_sha256: bodySha256,
+      }),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok !== true) {
+      return { ok: false, error: String(data?.error || `auth_verifier_${response.status}`) };
+    }
+    seenNonces.set(headers.nonce, now + MAX_SKEW_MS);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function healthPayload() {
@@ -43,12 +98,13 @@ function healthPayload() {
     ok: true,
     service: 'lji-source-router',
     version: VERSION,
+    auth_scheme: 'hmac-sha256-v1',
     configured: {
-      router_token: Boolean(config.routerToken),
+      auth_verifier: Boolean(config.authVerifierUrl),
       threads: Boolean(config.threadsToken),
       mercadolivre: false,
     },
-    collection_ready: Boolean(config.routerToken && config.threadsToken),
+    collection_ready: Boolean(config.authVerifierUrl && config.threadsToken),
     active_sources: ['threads'],
     disabled_sources: ['mercadolivre'],
     sources,
@@ -67,9 +123,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'POST' || url.pathname !== '/collect') {
       return send(res, 404, { ok: false, error: 'not_found', version: VERSION });
     }
-    if (!authorized(req)) return send(res, 401, { ok: false, error: 'unauthorized', version: VERSION });
 
-    const body = await readJson(req);
+    const rawBody = await readRawBody(req);
+    const auth = await authorized(req, rawBody);
+    if (!auth.ok) return send(res, 401, { ok: false, error: auth.error || 'unauthorized', version: VERSION });
+
+    let body;
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      return send(res, 400, { ok: false, error: 'invalid_json', version: VERSION });
+    }
+
     const validation = validateRequest(body);
     if (!validation.ok) return send(res, 400, { ok: false, error: validation.error, version: VERSION });
 
