@@ -46,7 +46,8 @@ async function runAdapter(source, request, config) {
 }
 
 function allSources(config) {
-  const sources = ['threads'];
+  const sources = [];
+  if (config.threadsToken) sources.push('threads');
   for (const source of APIFY_SOURCES) {
     if (config.apifyToken && config.apifyTasks?.[source]) sources.push(source);
   }
