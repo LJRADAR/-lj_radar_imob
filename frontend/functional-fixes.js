@@ -148,54 +148,69 @@
     await syncCommercialFixed();
   };
 
+  let patchedTimer=null;
+
+  const refresh=async()=>{
+    if(document.hidden||!window.LJI_BACKEND?.client)return;
+    const indicator=document.getElementById('autoRefreshStatus');
+    try{
+      const {data:{session}}=await window.LJI_BACKEND.client.auth.getSession();
+      if(!session)return;
+      if(indicator)indicator.textContent='Atualizando...';
+      const jobs=[
+        window.LJI_BACKEND.sync?.(),
+        (typeof syncIntentions==='function'?syncIntentions():Promise.resolve()),
+        window.LJI_BACKEND.syncAdmin?.(),
+        window.LJI_BACKEND.syncDiscovery?.(),
+        window.LJI_BACKEND.syncMetrics?.(),
+        window.LJI_BACKEND.syncDiscarded?.(),
+        syncCommercialFixed(),
+        window.LJI_BACKEND.syncRegistry?.(),
+        window.LJI_BACKEND.syncMatchAlerts?.(),
+        window.loadLeadBlocklist?.()
+      ];
+      await Promise.allSettled(jobs);
+      if(indicator){
+        let count='';
+        try{if(typeof owners!=='undefined'&&Array.isArray(owners))count=String(owners.length)}catch(_){}
+        indicator.textContent=`Base ${count||'—'} · atualizada ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+        indicator.classList.remove('auto-refresh-error');
+      }
+    }catch(e){
+      console.error('[functional-fixes] auto refresh:',e);
+      if(indicator){indicator.textContent='Auto: falha';indicator.classList.add('auto-refresh-error')}
+    }
+  };
+
+  function ensurePatchedAutoRefresh(){
+    // app-backend inicia a própria rotina de refresh só depois do sync inicial.
+    // Se ela nascer depois desta camada, substitui nosso timer. Este watchdog
+    // detecta isso e reinstala a rotina corrigida; custo desprezível (15 s).
+    if(window.LJI_AUTO_REFRESH_TIMER===patchedTimer&&patchedTimer)return;
+    if(window.LJI_AUTO_REFRESH_TIMER){
+      try{clearInterval(window.LJI_AUTO_REFRESH_TIMER)}catch(_){}
+    }
+    if(patchedTimer){
+      try{clearInterval(patchedTimer)}catch(_){}
+    }
+    patchedTimer=setInterval(refresh,120000);
+    window.LJI_AUTO_REFRESH_TIMER=patchedTimer;
+  }
+
   function install(){
     if(!window.LJI_BACKEND){setTimeout(install,250);return}
     window.LJI_BACKEND.syncCommercial=syncCommercialFixed;
-
-    // O auto-refresh original fecha sobre a versão antiga de syncCommercialModules.
-    // Substituímos o timer por uma rotina equivalente usando apenas as funções
-    // públicas já auditadas, inclusive o sync comercial corrigido.
-    if(window.LJI_AUTO_REFRESH_TIMER){clearInterval(window.LJI_AUTO_REFRESH_TIMER);window.LJI_AUTO_REFRESH_TIMER=null}
-    const refresh=async()=>{
-      if(document.hidden||!window.LJI_BACKEND?.client)return;
-      const indicator=document.getElementById('autoRefreshStatus');
-      try{
-        const {data:{session}}=await window.LJI_BACKEND.client.auth.getSession();
-        if(!session)return;
-        if(indicator)indicator.textContent='Atualizando...';
-        const jobs=[
-          window.LJI_BACKEND.sync?.(),
-          (typeof syncIntentions==='function'?syncIntentions():Promise.resolve()),
-          window.LJI_BACKEND.syncAdmin?.(),
-          window.LJI_BACKEND.syncDiscovery?.(),
-          window.LJI_BACKEND.syncMetrics?.(),
-          window.LJI_BACKEND.syncDiscarded?.(),
-          syncCommercialFixed(),
-          window.LJI_BACKEND.syncRegistry?.(),
-          window.LJI_BACKEND.syncMatchAlerts?.(),
-          window.loadLeadBlocklist?.()
-        ];
-        await Promise.allSettled(jobs);
-        if(indicator){
-          let count='';
-          try{if(typeof owners!=='undefined'&&Array.isArray(owners))count=String(owners.length)}catch(_){}
-          indicator.textContent=`Base ${count||'—'} · atualizada ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
-          indicator.classList.remove('auto-refresh-error');
-        }
-      }catch(e){
-        console.error('[functional-fixes] auto refresh:',e);
-        if(indicator){indicator.textContent='Auto: falha';indicator.classList.add('auto-refresh-error')}
-      }
-    };
+    ensurePatchedAutoRefresh();
     setTimeout(refresh,1000);
-    window.LJI_AUTO_REFRESH_TIMER=setInterval(refresh,120000);
+    window.LJI_FUNCTIONAL_REFRESH_WATCHDOG=setInterval(ensurePatchedAutoRefresh,15000);
 
     window.LJI_FUNCTIONAL_FIXES={
-      version:'1.0.0',
+      version:'1.1.0',
       tradeSchema:'owner_ref',
       companySchema:'property_type+budget_max',
       commercialSyncPatched:true,
-      autoRefreshUsesPatchedCommercialSync:true
+      autoRefreshUsesPatchedCommercialSync:true,
+      autoRefreshRaceGuard:true
     };
   }
 
