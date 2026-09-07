@@ -130,6 +130,10 @@ export async function routeCollection(request, config) {
     };
   }
 
+  const failedErrors = sourceReport
+    .filter((item) => item.ok !== true && item.error)
+    .map((item) => `${item.source}:${item.error}`);
+
   return {
     ok: successfulSources > 0,
     status: successfulSources === readySources ? 'completed' : successfulSources > 0 ? 'partial' : 'failed',
@@ -138,5 +142,6 @@ export async function routeCollection(request, config) {
     qualified_count: uniqueResults.length,
     results: uniqueResults,
     source_report: sourceReport,
+    error: successfulSources > 0 ? null : (failedErrors.join('; ') || 'collection_failed'),
   };
 }
