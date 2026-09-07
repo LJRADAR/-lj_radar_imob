@@ -1,3 +1,5 @@
+import { locationMatchesTarget } from '../normalize.js';
+
 const API = 'https://api.apify.com/v2';
 
 const SOURCE_LABELS = {
@@ -7,11 +9,16 @@ const SOURCE_LABELS = {
   telegram: 'Telegram público',
 };
 
-const OLX_CITY_SLUGS = {
-  'sao caetano do sul': 'sao-caetano-do-sul',
-  'santo andre': 'santo-andre',
-  'sao bernardo do campo': 'sao-bernardo-do-campo',
-  diadema: 'diadema',
+const OLX_SEARCH_TARGETS = {
+  'São Caetano do Sul': 'São Caetano do Sul SP',
+  'Santo André': 'Santo André SP',
+  'São Bernardo do Campo': 'São Bernardo do Campo SP',
+  'Diadema': 'Diadema SP',
+  'São Paulo Centro Expandido': 'Centro São Paulo SP',
+  'São Paulo Zona Sul': 'Zona Sul São Paulo SP',
+  'São Paulo Zona Leste': 'Zona Leste São Paulo SP',
+  'São Paulo Zona Oeste': 'Zona Oeste São Paulo SP',
+  'São Paulo Zona Norte': 'Zona Norte São Paulo SP',
 };
 
 function text(value) {
@@ -60,16 +67,6 @@ function nested(item, paths) {
   return null;
 }
 
-function cityMatches(expected, actual) {
-  const a = normalizeText(expected);
-  const b = normalizeText(actual);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  if (a === 'sao bernardo do campo') return b === 'sao bernardo' || b === 'sbc';
-  if (a === 'sao caetano do sul') return b === 'sao caetano';
-  return false;
-}
-
 function normalizePropertyType(value) {
   const n = normalizeText(value);
   if (!n) return null;
@@ -92,26 +89,24 @@ function propertyMetric(properties, labels) {
   return null;
 }
 
-function olxSearchUrl(request) {
-  const citySlug = OLX_CITY_SLUGS[normalizeText(request.city)];
-  if (!citySlug) return null;
+function olxSearchQuery(request) {
+  const target = OLX_SEARCH_TARGETS[request.city];
+  if (!target) return null;
   const operation = request.transaction_type === 'rent' ? 'aluguel' : 'venda';
-  const property = normalizeText(request.property_type_code);
-  let segment = '';
-  if (['apartamento', 'apto', 'apartment'].includes(property)) segment = '/apartamentos';
-  else if (['casa', 'sobrado', 'house', 'home'].includes(property)) segment = '/casas';
-  return `https://www.olx.com.br/imoveis/${operation}${segment}/estado-sp/sao-paulo-e-regiao/${citySlug}`;
+  const property = normalizePropertyType(request.property_type_code) || 'Imóvel';
+  return `${property} ${operation} ${target}`;
 }
 
-function buildTaskInput(request, source, maxItems) {
+export function buildTaskInput(request, source, maxItems) {
   if (source === 'olx') {
-    const searchUrl = olxSearchUrl(request);
-    if (!searchUrl) return null;
+    const searchQuery = olxSearchQuery(request);
+    if (!searchQuery) return null;
     return {
-      searchUrls: [searchUrl],
+      searchQueries: [searchQuery],
       maxResults: maxItems,
-      sortBy: 'Newest First',
-      enrichDetails: true,
+      sortBy: 'relevance',
+      state: 'SP',
+      enrichDetails: false,
       includeBusinessOnly: false,
     };
   }
@@ -135,9 +130,9 @@ function normalizeItem(item, request, source) {
   const title = text(first(item, ['title', 'name', 'caption', 'text', 'description']));
   const description = text(first(item, ['description', 'text', 'caption', 'content']));
   const actualCity = text(first(item, ['city', 'locationCity', 'municipality']));
-  if (source === 'olx' && (!actualCity || !cityMatches(request.city, actualCity))) return null;
-  const city = actualCity || request.city;
   const neighborhood = text(first(item, ['neighborhood', 'neighbourhood', 'bairro', 'district']));
+  if (source === 'olx' && (!actualCity || !locationMatchesTarget(request.city, actualCity, neighborhood || ''))) return null;
+  const city = actualCity || request.city;
   const publishedAt = text(first(item, ['published_at', 'publishedAt', 'postedAt', 'timestamp', 'date', 'createdAt', 'takenAtIso']));
   const seller = text(nested(item, ['seller.name', 'seller.username', 'owner.username', 'owner.fullName']))
     || text(first(item, ['sellerName', 'username', 'ownerName', 'author', 'ownerUsername']));
@@ -187,6 +182,8 @@ function normalizeItem(item, request, source) {
       postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
       category_name: text(first(item, ['categoryName', 'category'])),
       properties,
+      requested_target: request.city,
+      requested_transaction_type: request.transaction_type,
     },
     raw_quality: {
       apify: true,
