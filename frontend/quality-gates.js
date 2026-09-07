@@ -83,6 +83,14 @@
     };
   }
 
+  // A grade/exportação do Dashboard também é área comercial: somente approved.
+  if(typeof dashboardFilteredRows==='function'){
+    const baseDashboardFilteredRows=dashboardFilteredRows;
+    dashboardFilteredRows=function(){
+      return baseDashboardFilteredRows().filter(approvedOpportunity);
+    };
+  }
+
   // Highlights e leads quentes são áreas acionáveis: reviews continuam no módulo
   // de revisão, mas não entram nesses atalhos comerciais.
   if(typeof renderDashboardHighlights==='function'){
@@ -104,6 +112,55 @@
         owners=saved.filter(o=>!o?.is_current||approvedOpportunity(o));
         return baseHot();
       }finally{ owners=saved; }
+    };
+  }
+
+  // Central de Ação: reviews podem continuar existindo na base, mas não geram
+  // tarefa comercial, prioridade, atribuição ou contato automaticamente.
+  if(typeof buildActionCenter==='function'){
+    const baseBuildActionCenter=buildActionCenter;
+    buildActionCenter=function(){
+      const saved=owners;
+      try{
+        owners=saved.filter(o=>!o?.is_current||approvedOpportunity(o));
+        return baseBuildActionCenter();
+      }finally{ owners=saved; }
+    };
+  }
+
+  if(typeof renderActionCenter==='function'){
+    const baseRenderActionCenter=renderActionCenter;
+    renderActionCenter=function(){
+      const saved=owners;
+      try{
+        owners=saved.filter(o=>!o?.is_current||approvedOpportunity(o));
+        return baseRenderActionCenter();
+      }finally{ owners=saved; }
+    };
+  }
+
+  // Contatos: não chamar review de "ativo" e nunca usar last_seen/first_seen
+  // como data de publicação. Histórico/review só reaparece quando solicitado.
+  if(typeof contactCandidates==='function'){
+    const baseContactCandidates=contactCandidates;
+    contactCandidates=function(includeHistory=false){
+      const rows=baseContactCandidates(includeHistory);
+      const ownerById=new Map((Array.isArray(owners)?owners:[]).flatMap(o=>{
+        const ids=[o?.opportunity_id,o?.id].filter(Boolean).map(String);
+        return ids.map(id=>[id,o]);
+      }));
+      return rows.map(c=>{
+        if(c?.db_kind!=='opportunity')return c;
+        const o=ownerById.get(String(c?.db_id||''));
+        if(!o)return {...c,isActive:false,operationalStatus:'review',published_at:''};
+        const active=approvedOpportunity(o);
+        return {
+          ...c,
+          published_at:o?.published_at||'',
+          operationalStatus:o?.is_current===false?'historical':o?.status==='rejected'?'discarded':active?'active':'review',
+          isActive:active
+        };
+      }).filter(c=>includeHistory||c?.db_kind!=='opportunity'||c.isActive);
     };
   }
 
@@ -229,7 +286,7 @@
   }
 
   window.LJI_FRONTEND_QUALITY_GATES={
-    version:'1.1.0',
+    version:'1.2.0',
     matchRequiresApproved:true,
     matchRequiresRealPublishedAt:true,
     maxPublicationDays:MAX_PUBLICATION_DAYS,
