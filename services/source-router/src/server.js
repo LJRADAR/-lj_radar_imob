@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 import { verifyQuinto } from './adapters/quinto.js';
 
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 const MAX_BODY_BYTES = 128000;
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
@@ -91,8 +91,13 @@ async function authorized(req, rawBody, signedPath) {
   }
 }
 
+function hasRegionalOlxTask() {
+  return Object.values(config.apifyOlxTasks || {}).some(Boolean);
+}
+
 function apifySourceStatus(source) {
   if (!config.apifyToken) return 'needs_apify_token';
+  if (source === 'olx' && (config.apifyTasks?.olx || hasRegionalOlxTask())) return 'ready_via_apify';
   if (!config.apifyTasks?.[source]) return 'needs_apify_task';
   return 'ready_via_apify';
 }
@@ -120,6 +125,7 @@ function healthPayload() {
       threads_token: Boolean(config.threadsToken),
       apify_token: Boolean(config.apifyToken),
       apify_tasks: Object.fromEntries(Object.entries(config.apifyTasks || {}).map(([key, value]) => [key, Boolean(value)])),
+      apify_olx_regional_tasks: Object.fromEntries(Object.entries(config.apifyOlxTasks || {}).map(([key, value]) => [key, Boolean(value)])),
     },
     apify_cost_guard: {
       max_total_charge_usd_per_run: config.apifyMaxChargeUsd,
