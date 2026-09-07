@@ -13,6 +13,7 @@ export const config = {
     instagram: String(process.env.APIFY_TASK_INSTAGRAM || '').trim(),
     facebook: String(process.env.APIFY_TASK_FACEBOOK || '').trim(),
     telegram: String(process.env.APIFY_TASK_TELEGRAM || '').trim(),
+    quinto: String(process.env.APIFY_TASK_QUINTO || '').trim(),
   },
   apifyMaxChargeUsd: clamp(process.env.APIFY_MAX_CHARGE_USD, 0.25, 0.01, 5),
   apifyTimeoutSecs: clamp(process.env.APIFY_TIMEOUT_SECS, 35, 10, 40),
