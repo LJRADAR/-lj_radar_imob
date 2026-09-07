@@ -40,4 +40,13 @@ window.addEventListener('load', () => {
     access.onerror = () => console.error('LJ Radar: access-contract.js não carregou.');
     document.head.appendChild(access);
   }
+
+  if (!document.querySelector('script[data-lji-functional-fixes]')) {
+    const fixes = document.createElement('script');
+    fixes.src = 'functional-fixes.js?v=20260907-1';
+    fixes.async = true;
+    fixes.dataset.ljiFunctionalFixes = '1';
+    fixes.onerror = () => console.error('LJ Radar: functional-fixes.js não carregou.');
+    document.head.appendChild(fixes);
+  }
 });
