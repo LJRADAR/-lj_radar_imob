@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const FUNCTION_NAME = "lji-source-router-auth-v1";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const MAX_SKEW_MS = 120_000;
 const ROUTER_URL = "https://lji-source-router.onrender.com";
+const ALLOWED_PATHS = new Set(["/collect", "/verify-quinto"]);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +61,7 @@ async function hmac(secret: string, message: string): Promise<string> {
   return toBase64(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)));
 }
 
-async function verifySignature(secret: string, timestamp: string, nonce: string, bodySha256: string, signatureB64: string) {
+async function verifySignature(secret: string, path: string, timestamp: string, nonce: string, bodySha256: string, signatureB64: string) {
   const signature = fromBase64(signatureB64);
   if (!signature) return false;
   const key = await crypto.subtle.importKey(
@@ -70,7 +71,7 @@ async function verifySignature(secret: string, timestamp: string, nonce: string,
     false,
     ["verify"],
   );
-  const message = `POST\n/collect\n${timestamp}\n${nonce}\n${bodySha256}`;
+  const message = `POST\n${path}\n${timestamp}\n${nonce}\n${bodySha256}`;
   return crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(message));
 }
 
@@ -138,6 +139,7 @@ Deno.serve(async (req) => {
       named_secret_available: Boolean(namedSecret()),
       auth_scheme: "hmac-sha256-v1",
       max_skew_ms: MAX_SKEW_MS,
+      allowed_paths: [...ALLOWED_PATHS],
     });
   }
 
@@ -154,6 +156,9 @@ Deno.serve(async (req) => {
 
   const secret = namedSecret();
   if (!secret) return json({ ok: false, error: "verifier_secret_unavailable" }, 503);
+
+  const path = String(body.path ?? "/collect").trim();
+  if (!ALLOWED_PATHS.has(path)) return json({ ok: false, error: "signed_path_not_allowed" }, 400);
 
   const timestamp = String(body.timestamp ?? "").trim();
   const nonce = String(body.nonce ?? "").trim();
@@ -172,8 +177,8 @@ Deno.serve(async (req) => {
   }
   if (!signature) return json({ ok: false, error: "signature_missing" }, 401);
 
-  const valid = await verifySignature(secret, timestamp, nonce, bodySha256, signature);
+  const valid = await verifySignature(secret, path, timestamp, nonce, bodySha256, signature);
   if (!valid) return json({ ok: false, error: "signature_invalid" }, 401);
 
-  return json({ ok: true, version: VERSION, auth_scheme: "hmac-sha256-v1" });
+  return json({ ok: true, version: VERSION, auth_scheme: "hmac-sha256-v1", signed_path: path });
 });
