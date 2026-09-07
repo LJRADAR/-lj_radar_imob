@@ -70,15 +70,21 @@ async function resolveActor(actorRef) {
 }
 
 async function listTasks() {
-  const data = await api('/actor-tasks?limit=1000&desc=1');
+  const data = await api('/actor-tasks?limit=1000');
   return Array.isArray(data?.items) ? data.items : [];
 }
 
 async function upsertTask(profile, actor, existingTasks) {
   const existing = existingTasks.find((row) => row?.name === profile.taskName);
-  const body = {
+  const createBody = {
     actId: actor.id,
     name: profile.taskName,
+    title: profile.title,
+    description: profile.description,
+    options: profile.options,
+    input: profile.input,
+  };
+  const updateBody = {
     title: profile.title,
     description: profile.description,
     options: profile.options,
@@ -104,14 +110,14 @@ async function upsertTask(profile, actor, existingTasks) {
     }
     const updated = await api(`/actor-tasks/${encodeURIComponent(existing.id)}`, {
       method: 'PUT',
-      body: JSON.stringify(body),
+      body: JSON.stringify(updateBody),
     });
     return { action: 'updated', key: profile.key, env_key: profile.envKey, actor: profile.actorRef, task_name: profile.taskName, task_id: updated.id };
   }
 
   const created = await api('/actor-tasks', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify(createBody),
   });
   return { action: 'created', key: profile.key, env_key: profile.envKey, actor: profile.actorRef, task_name: profile.taskName, task_id: created.id };
 }
