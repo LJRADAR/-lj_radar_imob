@@ -67,6 +67,17 @@ function nested(item, paths) {
   return null;
 }
 
+function safeApifyError(payload) {
+  const error = payload && typeof payload === 'object' ? payload.error : null;
+  if (!error || typeof error !== 'object') return null;
+  const detail = {
+    type: text(error.type),
+    message: text(error.message)?.slice(0, 500) || null,
+    approval_url: text(error.data?.approvalUrl),
+  };
+  return Object.values(detail).some(Boolean) ? detail : null;
+}
+
 function normalizePropertyType(value) {
   const n = normalizeText(value);
   if (!n) return null;
@@ -241,12 +252,20 @@ export async function collectApifyTask(request, {
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
+      const apify_error = safeApifyError(payload);
+      console.error('Apify request failed', JSON.stringify({
+        status: response.status,
+        source,
+        task_id: taskId,
+        apify_error,
+      }));
       return {
         ok: false,
         status: 'failed',
         source,
         results: [],
         error: `apify_http_${response.status}`,
+        apify_error,
       };
     }
 
