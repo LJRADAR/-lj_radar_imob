@@ -15,6 +15,7 @@ function norm(value) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -92,7 +93,7 @@ function addressSignals(candidate, row) {
   return { street, neighborhood, rowStreet, rowNeighborhood };
 }
 
-function scoreMatch(candidate, row) {
+export function scoreQuintoMatch(candidate, row) {
   const candidateCity = norm(candidate?.city);
   const rowCity = norm(row?.address?.city ?? row?.city);
   const expectedOperation = candidate?.transaction_type === 'rent' ? 'rent' : 'buy';
@@ -207,7 +208,7 @@ export async function verifyQuinto(candidate, {
     const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
     let best = null;
     for (const row of rows) {
-      const match = scoreMatch(candidate, row);
+      const match = scoreQuintoMatch(candidate, row);
       if (!best || match.score > best.match.score) best = { row, match };
     }
 
