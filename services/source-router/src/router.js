@@ -1,11 +1,11 @@
-import { collectMercadoLivre } from './adapters/mercadolivre.js';
 import { collectThreads } from './adapters/threads.js';
 
 const CORE_TARGETS = new Set([
   'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema',
   'São Paulo Centro Expandido', 'São Paulo Zona Sul', 'São Paulo Zona Leste', 'São Paulo Zona Oeste', 'São Paulo Zona Norte',
 ]);
-const SOURCES = new Set(['all', 'mercadolivre', 'threads']);
+const SOURCES = new Set(['all', 'threads']);
+const DISABLED_SOURCES = new Set(['mercadolivre']);
 
 export function validateRequest(body) {
   const request = {
@@ -19,14 +19,14 @@ export function validateRequest(body) {
   if (request.state_code !== 'SP') return { ok: false, error: 'state_not_supported' };
   if (!CORE_TARGETS.has(request.city)) return { ok: false, error: 'city_not_in_core_operation' };
   if (!request.transaction_type) return { ok: false, error: 'invalid_transaction_type' };
+  if (DISABLED_SOURCES.has(request.source)) {
+    return { ok: false, error: 'source_temporarily_disabled_pending_official_access' };
+  }
   if (!SOURCES.has(request.source)) return { ok: false, error: 'source_not_supported' };
   return { ok: true, request };
 }
 
 async function runAdapter(source, request, config) {
-  if (source === 'mercadolivre') {
-    return collectMercadoLivre(request, { token: config.mercadoLivreToken, timeoutMs: config.requestTimeoutMs });
-  }
   if (source === 'threads') {
     return collectThreads(request, { token: config.threadsToken, timeoutMs: config.requestTimeoutMs });
   }
@@ -34,7 +34,7 @@ async function runAdapter(source, request, config) {
 }
 
 export async function routeCollection(request, config) {
-  const requestedSources = request.source === 'all' ? ['mercadolivre', 'threads'] : [request.source];
+  const requestedSources = request.source === 'all' ? ['threads'] : [request.source];
   const settled = await Promise.all(requestedSources.map(async (source) => {
     try {
       return await runAdapter(source, request, config);
@@ -46,7 +46,6 @@ export async function routeCollection(request, config) {
   const results = [];
   const sourceReport = [];
   let rawCount = 0;
-  let qualifiedCount = 0;
   let readySources = 0;
   let successfulSources = 0;
 
@@ -55,7 +54,6 @@ export async function routeCollection(request, config) {
     if (result?.status !== 'not_configured') readySources += 1;
     if (result?.ok === true) successfulSources += 1;
     rawCount += Number(result?.raw_count || 0);
-    qualifiedCount += Number(result?.qualified_count || rows.length);
     results.push(...rows);
     sourceReport.push({
       source: result?.source || 'unknown',
