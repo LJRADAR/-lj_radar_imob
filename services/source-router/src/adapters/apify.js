@@ -82,10 +82,12 @@ export async function collectApifyTask(request, {
     return { ok: false, status: 'not_configured', source, results: [], error: `APIFY_TASK_${source.toUpperCase()}_missing` };
   }
 
+  const maxItems = Math.max(1, Math.min(80, Number(request.limit || 30)));
   const url = new URL(`${API}/actor-tasks/${encodeURIComponent(taskId)}/run-sync-get-dataset-items`);
   url.searchParams.set('clean', '1');
   url.searchParams.set('format', 'json');
-  url.searchParams.set('limit', String(Math.max(1, Math.min(80, Number(request.limit || 30)))));
+  url.searchParams.set('limit', String(maxItems));
+  url.searchParams.set('maxItems', String(maxItems));
   url.searchParams.set('timeout', String(timeoutSecs));
   url.searchParams.set('maxTotalChargeUsd', String(maxChargeUsd));
 
@@ -105,9 +107,9 @@ export async function collectApifyTask(request, {
           city: request.city,
           transaction_type: request.transaction_type,
           property_type_code: request.property_type_code,
-          limit: request.limit,
+          limit: maxItems,
         },
-        maxItems: request.limit,
+        maxItems,
       }),
       signal: controller.signal,
     });
@@ -131,7 +133,7 @@ export async function collectApifyTask(request, {
       if (!row?.source_url || seen.has(row.source_url)) continue;
       seen.add(row.source_url);
       normalized.push(row);
-      if (normalized.length >= request.limit) break;
+      if (normalized.length >= maxItems) break;
     }
 
     return {
@@ -142,7 +144,10 @@ export async function collectApifyTask(request, {
       raw_count: rows.length,
       qualified_count: normalized.length,
       results: normalized,
-      cost_guard: { max_total_charge_usd: maxChargeUsd },
+      cost_guard: {
+        max_total_charge_usd: maxChargeUsd,
+        max_paid_dataset_items: maxItems,
+      },
     };
   } catch (error) {
     return {
