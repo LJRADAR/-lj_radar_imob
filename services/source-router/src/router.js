@@ -1,10 +1,12 @@
 import { collectThreads } from './adapters/threads.js';
+import { collectApifyTask } from './adapters/apify.js';
 
 const CORE_TARGETS = new Set([
   'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema',
   'São Paulo Centro Expandido', 'São Paulo Zona Sul', 'São Paulo Zona Leste', 'São Paulo Zona Oeste', 'São Paulo Zona Norte',
 ]);
-const SOURCES = new Set(['all', 'threads']);
+const APIFY_SOURCES = new Set(['olx', 'instagram', 'facebook', 'telegram']);
+const SOURCES = new Set(['all', 'threads', ...APIFY_SOURCES]);
 const DISABLED_SOURCES = new Set(['mercadolivre']);
 
 export function validateRequest(body) {
@@ -30,11 +32,29 @@ async function runAdapter(source, request, config) {
   if (source === 'threads') {
     return collectThreads(request, { token: config.threadsToken, timeoutMs: config.requestTimeoutMs });
   }
+  if (APIFY_SOURCES.has(source)) {
+    return collectApifyTask(request, {
+      token: config.apifyToken,
+      taskId: config.apifyTasks?.[source] || '',
+      source,
+      timeoutMs: config.requestTimeoutMs,
+      timeoutSecs: config.apifyTimeoutSecs,
+      maxChargeUsd: config.apifyMaxChargeUsd,
+    });
+  }
   return { ok: false, status: 'unsupported', source, results: [], error: 'source_not_supported' };
 }
 
+function allSources(config) {
+  const sources = ['threads'];
+  for (const source of APIFY_SOURCES) {
+    if (config.apifyToken && config.apifyTasks?.[source]) sources.push(source);
+  }
+  return sources;
+}
+
 export async function routeCollection(request, config) {
-  const requestedSources = request.source === 'all' ? ['threads'] : [request.source];
+  const requestedSources = request.source === 'all' ? allSources(config) : [request.source];
   const settled = await Promise.all(requestedSources.map(async (source) => {
     try {
       return await runAdapter(source, request, config);
@@ -57,11 +77,13 @@ export async function routeCollection(request, config) {
     results.push(...rows);
     sourceReport.push({
       source: result?.source || 'unknown',
+      provider: result?.provider || (result?.source === 'threads' ? 'threads_api' : null),
       ok: result?.ok === true,
       status: result?.status || 'unknown',
       raw_count: Number(result?.raw_count || 0),
       qualified_count: Number(result?.qualified_count || rows.length),
       error: result?.error || null,
+      cost_guard: result?.cost_guard || null,
     });
   }
 
