@@ -1,7 +1,7 @@
 // ============================================================
 // LJ RADAR - CAPTURA MANUAL DE LINK
 // Function: lji-manual-capture-v1
-// Version: 1.0.0
+// Version: 1.1.0
 //
 // Recebe um link colado pelo usuário (Facebook, Instagram, OLX,
 // Threads, X, Telegram, TikTok, YouTube ou web aberta) e o faz
@@ -20,11 +20,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const FUNCTION_NAME = "lji-manual-capture-v1";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
-const WORKSPACE_ID = "85720ad0-428b-4e08-b562-e9a4d00fcc30";
 const SALE_COMMISSION_RATE = 0.0125;
 const PAGE_TIMEOUT_MS = 12000;
+const MAX_REDIRECTS = 5;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")?.trim() ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")?.trim() ?? "";
@@ -75,6 +75,22 @@ function adminClient() {
   });
 }
 
+async function resolveWorkspace(admin: ReturnType<typeof createClient>, userId: string, requested: unknown): Promise<string | null> {
+  const requestedId = txt(requested);
+  let q = admin.from("lji_workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(requestedId ? 1 : 2);
+  if (requestedId) q = q.eq("workspace_id", requestedId);
+  const { data, error } = await q;
+  if (error) throw new Error(`workspace_lookup_failed:${error.message}`);
+  if (requestedId) return data?.[0]?.workspace_id ?? null;
+  if ((data?.length ?? 0) === 1) return data![0].workspace_id;
+  if ((data?.length ?? 0) > 1) throw new Error("workspace_id_required_for_multi_workspace_user");
+  return null;
+}
+
 function normalizeUrl(raw: string): string | null {
   try {
     const u = new URL(raw.trim());
@@ -95,13 +111,67 @@ function normalizeUrl(raw: string): string | null {
   }
 }
 
+function isBlockedIpv4(ip: string): boolean {
+  const p = ip.split(".").map(Number);
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a,b] = p;
+  return a === 0 || a === 10 || a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224;
+}
+
+function isBlockedIpv6(ip: string): boolean {
+  const n = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (n === "::" || n === "::1") return true;
+  if (n.startsWith("fc") || n.startsWith("fd")) return true;
+  if (/^fe[89ab]/.test(n)) return true;
+  const mapped = n.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  return Boolean(mapped && isBlockedIpv4(mapped[1]));
+}
+
+function hostLooksPrivate(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (!h || h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  if (isBlockedIpv4(h) || (h.includes(":") && isBlockedIpv6(h))) return true;
+  return false;
+}
+
+async function assertPublicUrl(raw: string): Promise<URL> {
+  const u = new URL(raw);
+  if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("unsafe_url_protocol");
+  if (u.username || u.password) throw new Error("unsafe_url_credentials");
+  if (hostLooksPrivate(u.hostname)) throw new Error("unsafe_url_host");
+
+  // Resolve DNS before every hop to reduce DNS-rebinding / private-network SSRF.
+  // If DNS resolution is unavailable in this runtime, fail closed rather than fetch blindly.
+  if (!/^[0-9.]+$/.test(u.hostname) && !u.hostname.includes(":")) {
+    let resolved = false;
+    for (const rr of ["A", "AAAA"] as const) {
+      try {
+        const addrs = await Deno.resolveDns(u.hostname, rr);
+        for (const addr of addrs) {
+          resolved = true;
+          if (isBlockedIpv4(addr) || isBlockedIpv6(addr)) throw new Error("unsafe_dns_target");
+        }
+      } catch (e) {
+        const msg = String((e as Error)?.message || e);
+        if (msg.includes("unsafe_dns_target")) throw e;
+      }
+    }
+    if (!resolved) throw new Error("dns_resolution_failed");
+  }
+  return u;
+}
+
 async function sha256(v: string) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-// Mesma nomenclatura de fonte usada pelo coletor automático, para que o link
-// manual apareça no sistema com a mesma origem dos capturados pelo robô.
 function sourceNameFor(url: string): string {
   try {
     const u = new URL(url);
@@ -137,8 +207,6 @@ function platformLabel(url: string): string {
   }
 }
 
-// Domínios que cobram para exibir o contato do anunciante: capturar de lá não
-// gera lead acionável. Mesma lista aplicada pelo coletor e pelo enriquecedor.
 const BLOCKED = [
   "proprietariodireto.com.br", "rentola.com.br", "waa2.com.br", "achoumudou.com.br",
   "mgfimoveis.com.br", "quintoandar.com.br", "zapimoveis.com.br", "vivareal.com.br",
@@ -153,21 +221,34 @@ function blockedDomain(url: string) {
   }
 }
 
-async function fetchPageText(url: string): Promise<{ ok: boolean; text: string; status: number | null }> {
+async function fetchPageText(url: string): Promise<{ ok: boolean; text: string; status: number | null; security?: string }> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
   try {
-    const r = await fetch(url, {
-      redirect: "follow",
-      signal: ctrl.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; LJ-Radar-Manual/1.0)",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-      },
-    });
+    let current = (await assertPublicUrl(url)).toString();
+    let r: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      r = await fetch(current, {
+        redirect: "manual",
+        signal: ctrl.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; LJ-Radar-Manual/1.1)",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "pt-BR,pt;q=0.9",
+        },
+      });
+      if (![301,302,303,307,308].includes(r.status)) break;
+      const location = r.headers.get("location");
+      if (!location || hop === MAX_REDIRECTS) return { ok: false, text: "", status: r.status, security: "redirect_limit" };
+      current = (await assertPublicUrl(new URL(location, current).toString())).toString();
+    }
+    if (!r) return { ok: false, text: "", status: null };
     if (!r.ok) return { ok: false, text: "", status: r.status };
-    const html = await r.text();
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (ct && !ct.includes("text/html") && !ct.includes("application/xhtml+xml")) {
+      return { ok: false, text: "", status: 415, security: "content_type_rejected" };
+    }
+    const html = (await r.text()).slice(0, 1_000_000);
     const clean = html
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -175,12 +256,13 @@ async function fetchPageText(url: string): Promise<{ ok: boolean; text: string; 
       .replace(/&nbsp;/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
-    // og:title/description costumam ser a única parte legível em redes sociais.
     const metas = [...html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:title|og:description|description)["'][^>]+content=["']([^"']+)["']/gi)]
       .map((m) => m[1]).join(" ");
     return { ok: true, text: `${metas} ${clean}`.slice(0, 40000), status: r.status };
-  } catch {
-    return { ok: false, text: "", status: null };
+  } catch (e) {
+    const message = String((e as Error)?.message || e);
+    const security = /unsafe_|dns_resolution_failed/.test(message) ? message : undefined;
+    return { ok: false, text: "", status: null, security };
   } finally {
     clearTimeout(t);
   }
@@ -199,8 +281,6 @@ const CITIES = [
 ];
 function detectCity(text: string, url: string): string | null {
   const n = norm(`${text} ${url}`);
-  // Ordem importa: "São Caetano" antes de "São Paulo" evita casar a capital
-  // num texto que menciona apenas o estado.
   for (const c of CITIES) if (n.includes(norm(c))) return c;
   if (/\bsao caetano\b/.test(n)) return "São Caetano do Sul";
   if (/\bsao bernardo\b/.test(n)) return "São Bernardo do Campo";
@@ -219,7 +299,6 @@ function detectPropertyType(text: string): string | null {
   return null;
 }
 
-// Post de quem PROCURA imóvel (não anuncia) vira intenção de compra.
 function isBuyerIntent(text: string): boolean {
   return /\b(procuro|busco|estou procurando|quero comprar|quero alugar|preciso de (?:casa|apartamento|imovel)|alguem tem (?:casa|apartamento|imovel)|alguem indica)\b/.test(norm(text));
 }
@@ -293,14 +372,15 @@ Deno.serve(async (req) => {
       pipeline: ["lj_v2_raw_discoveries", "enriquecedor-lj-v2", "verificador-quinto-lj", "oportunidades_lj"],
       platforms: ["Facebook", "Instagram", "OLX", "Threads", "X", "Telegram", "TikTok", "YouTube", "web aberta"],
       named_secret_available: Boolean(namedSecret()),
+      workspace_resolution: "authenticated_membership",
+      ssrf_guard: true,
+      redirect_policy: "manual_checked_each_hop",
     });
   }
 
   const admin = adminClient();
   if (!admin) return reply({ ok: false, error: "supabase_admin_unavailable" }, 500);
 
-  // Autenticação pela sessão do usuário no app, com a mesma permissão exigida
-  // para disparar o coletor manualmente.
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth || !ANON) return reply({ ok: false, error: "auth_required" }, 401);
   const uc = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } } });
@@ -308,6 +388,14 @@ Deno.serve(async (req) => {
   if (!user) return reply({ ok: false, error: "auth_required" }, 401);
   const { data: perm } = await uc.rpc("lj_v2_has_permission", { p_permission_key: "run_manual_collector" });
   if (perm !== true) return reply({ ok: false, error: "sem_permissao" }, 403);
+
+  let workspaceId: string | null = null;
+  try {
+    workspaceId = await resolveWorkspace(admin, user.id, body.workspace_id);
+  } catch (e) {
+    return reply({ ok: false, error: String((e as Error)?.message || e) }, 400);
+  }
+  if (!workspaceId) return reply({ ok: false, error: "workspace_access_denied" }, 403);
 
   const url = normalizeUrl(String(body.url ?? ""));
   if (!url) return reply({ ok: false, error: "link_invalido", message: "Cole um link completo, começando com https://" }, 400);
@@ -318,18 +406,22 @@ Deno.serve(async (req) => {
     }, 400);
   }
 
-  // Link já capturado antes (pelo robô ou manualmente): não duplica.
   const { data: dup } = await admin.from("lj_v2_raw_discoveries").select("id,metadata").eq("normalized_url", url).limit(1);
   const existingId = dup?.[0]?.id as string | undefined;
 
   const page = await fetchPageText(url);
   if (!page.ok && !existingId) {
     return reply({
-      ok: false, error: "pagina_inacessivel", http_status: page.status,
-      message: page.status === 404
-        ? "A página não existe mais (o anúncio pode ter sido removido)."
-        : `Não consegui abrir essa página${page.status ? ` (erro ${page.status})` : ""}. Posts de grupo fechado do Facebook e perfis privados não são acessíveis de fora.`,
-    }, 422);
+      ok: false,
+      error: page.security ? "url_bloqueada_por_seguranca" : "pagina_inacessivel",
+      security_reason: page.security ?? null,
+      http_status: page.status,
+      message: page.security
+        ? "Esse endereço foi bloqueado pela proteção de rede da captura manual."
+        : page.status === 404
+          ? "A página não existe mais (o anúncio pode ter sido removido)."
+          : `Não consegui abrir essa página${page.status ? ` (erro ${page.status})` : ""}. Posts de grupo fechado do Facebook e perfis privados não são acessíveis de fora.`,
+    }, page.security ? 400 : 422);
   }
 
   const pageText = page.text;
@@ -348,12 +440,11 @@ Deno.serve(async (req) => {
     }, 422);
   }
 
-  // Post de quem PROCURA imóvel entra como intenção de compra, não como oportunidade.
   if (isBuyerIntent(pageText)) {
     const contact = extractPhone(pageText);
     const fingerprint = await sha256([url, city, tx, "buyer"].map(norm).join("|"));
     const { error } = await admin.from("lji_buyer_intents").upsert({
-      workspace_id: WORKSPACE_ID,
+      workspace_id: workspaceId,
       title: txt(pageText.slice(0, 140)),
       intent_text: pageText.slice(0, 1200),
       region: city, city, property_type: propertyType,
@@ -362,7 +453,7 @@ Deno.serve(async (req) => {
       source_name: sourceName, source_url: url, contact,
       captured_at: new Date().toISOString(),
       intent_score: contact ? 92 : 80, status: "active", fingerprint,
-      raw_snapshot: { source: "manual_paste", captured_by: user.id, platform: platformLabel(url) },
+      raw_snapshot: { source: "manual_paste", captured_by: user.id, workspace_id: workspaceId, platform: platformLabel(url) },
     }, { onConflict: "workspace_id,fingerprint" });
 
     return reply({
@@ -373,7 +464,6 @@ Deno.serve(async (req) => {
     }, error ? 500 : 200);
   }
 
-  // ---- Entra no pipeline padrão -------------------------------------------
   let sourceId: string | null = null;
   {
     const { data } = await admin.from("lj_v2_sources").select("id").eq("name", sourceName).eq("is_active", true).limit(1).maybeSingle();
@@ -386,16 +476,16 @@ Deno.serve(async (req) => {
 
   let discoveryId = existingId ?? null;
   const meta = {
-    search_context: { city, transaction_type: tx, property_type_code: propertyType, manual: true },
+    search_context: { city, transaction_type: tx, property_type_code: propertyType, manual: true, workspace_id: workspaceId },
     provider: "manual_paste",
     captured_by: user.id,
+    workspace_id: workspaceId,
     platform: platformLabel(url),
     url_classification: "individual_candidate",
     source_name: sourceName,
   };
 
   if (discoveryId) {
-    // Recaptura força novo enriquecimento: limpa a marca de "já enriquecido".
     await admin.from("lj_v2_raw_discoveries").update({
       detected_city: city, detected_transaction: tx, detected_property_type: propertyType,
       last_seen_at: new Date().toISOString(), discovery_status: "raw", metadata: meta,
@@ -406,7 +496,7 @@ Deno.serve(async (req) => {
       title: txt(pageText.slice(0, 160)), snippet: txt(pageText.slice(0, 600)),
       detected_state_code: "SP", detected_city: city, detected_transaction: tx,
       detected_property_type: propertyType, discovery_status: "raw", metadata: meta,
-      raw_payload: { source: "manual_paste", url },
+      raw_payload: { source: "manual_paste", url, workspace_id: workspaceId },
     }).select("id").single();
     if (ins.error || !ins.data?.id) {
       return reply({ ok: false, error: "falha_ao_registrar", details: ins.error?.message }, 500);
@@ -414,8 +504,6 @@ Deno.serve(async (req) => {
     discoveryId = ins.data.id;
   }
 
-  // 1) Enriquecimento: busca a página, extrai preço/endereço/telefone/WhatsApp
-  //    e classifica proprietário x corretor.
   let enrich: Json;
   try {
     enrich = await callFn("enriquecedor-lj-v2", { action: "enrich", discovery_ids: [discoveryId], latest_run_only: false, limit: 1 });
@@ -458,8 +546,6 @@ Deno.serve(async (req) => {
     }, 422);
   }
 
-  // 2) Verificação no QuintoAndar + gravação da oportunidade, exatamente como
-  //    no fluxo automático.
   const listingId = String(result.listing_id);
   const { data: listing } = await admin.from("lj_v2_listings")
     .select("id,property_id,original_url,title,description,transaction_type,price,advertised_city,advertised_neighborhood,advertised_address,advertiser_name,listing_status,published_at")
@@ -500,8 +586,6 @@ Deno.serve(async (req) => {
     phone_normalized: txt(contact?.phone_normalized),
     contact_confidence: num(rel?.confidence_score),
     phone_found: Boolean(txt(contact?.phone_raw)) || detected.phone_found,
-    // Telefone só é confiável quando o enriquecedor manteve o número normalizado
-    // (ele o remove quando o mesmo número aparece sob anunciantes diferentes).
     phone_trusted: Boolean(txt(contact?.phone_normalized)),
     whatsapp_status: txt(contact?.whatsapp_status) ?? detected.whatsapp_status,
     listing_status: txt(listing?.listing_status),
