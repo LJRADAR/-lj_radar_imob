@@ -25,7 +25,7 @@ window.LJI_CONFIG = {
 window.addEventListener('load', () => {
   if (!document.querySelector('script[data-lji-quality-gates]')) {
     const quality = document.createElement('script');
-    quality.src = 'quality-gates.js?v=20260907-2';
+    quality.src = 'quality-gates.js?v=20260907-3';
     quality.async = true;
     quality.dataset.ljiQualityGates = '1';
     quality.onerror = () => console.error('LJ Radar: quality-gates.js não carregou.');
