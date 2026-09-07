@@ -6,6 +6,19 @@ import { locationMatchesTarget } from '../src/normalize.js';
 test('accepts São Caetano core target', () => {
   const result = validateRequest({ state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
   assert.equal(result.ok, true);
+  assert.equal(result.request.source, 'all');
+});
+
+test('accepts explicit Threads source', () => {
+  const result = validateRequest({ source: 'threads', state_code: 'SP', city: 'Santo André', transaction_type: 'sale' });
+  assert.equal(result.ok, true);
+  assert.equal(result.request.source, 'threads');
+});
+
+test('rejects unsupported source', () => {
+  const result = validateRequest({ source: 'unknown', state_code: 'SP', city: 'São Caetano do Sul', transaction_type: 'sale' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'source_not_supported');
 });
 
 test('rejects out-of-scope city', () => {
