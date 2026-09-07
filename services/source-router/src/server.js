@@ -2,8 +2,9 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
+import { verifyQuinto } from './adapters/quinto.js';
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const MAX_BODY_BYTES = 128000;
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
@@ -42,7 +43,7 @@ function authHeaders(req) {
   };
 }
 
-async function authorized(req, rawBody) {
+async function authorized(req, rawBody, signedPath) {
   if (!config.authVerifierUrl) return { ok: false, error: 'auth_verifier_not_configured' };
 
   const headers = authHeaders(req);
@@ -69,6 +70,7 @@ async function authorized(req, rawBody) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        path: signedPath,
         timestamp: headers.timestamp,
         nonce: headers.nonce,
         signature: headers.signature,
@@ -77,7 +79,7 @@ async function authorized(req, rawBody) {
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.ok !== true) {
+    if (!response.ok || data?.ok !== true || data?.signed_path !== signedPath) {
       return { ok: false, error: String(data?.error || `auth_verifier_${response.status}`) };
     }
     seenNonces.set(headers.nonce, now + MAX_SKEW_MS);
@@ -124,9 +126,13 @@ function healthPayload() {
       timeout_seconds: config.apifyTimeoutSecs,
     },
     collection_ready: Boolean(config.authVerifierUrl && readySources.length > 0),
+    quinto_verifier_ready: Boolean(config.authVerifierUrl && config.apifyToken && config.apifyTasks?.quinto),
     ready_sources: readySources,
     disabled_sources: ['mercadolivre'],
-    sources,
+    sources: {
+      ...sources,
+      quinto_verifier: apifySourceStatus('quinto'),
+    },
   };
 }
 
@@ -139,12 +145,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, healthPayload());
     }
 
-    if (req.method !== 'POST' || url.pathname !== '/collect') {
+    if (req.method !== 'POST' || !['/collect', '/verify-quinto'].includes(url.pathname)) {
       return send(res, 404, { ok: false, error: 'not_found', version: VERSION });
     }
 
     const rawBody = await readRawBody(req);
-    const auth = await authorized(req, rawBody);
+    const auth = await authorized(req, rawBody, url.pathname);
     if (!auth.ok) return send(res, 401, { ok: false, error: auth.error || 'unauthorized', version: VERSION });
 
     let body;
@@ -152,6 +158,21 @@ const server = http.createServer(async (req, res) => {
       body = rawBody ? JSON.parse(rawBody) : {};
     } catch {
       return send(res, 400, { ok: false, error: 'invalid_json', version: VERSION });
+    }
+
+    if (url.pathname === '/verify-quinto') {
+      const candidate = body?.candidate && typeof body.candidate === 'object' ? body.candidate : body;
+      if (!candidate?.city || !['sale', 'rent'].includes(candidate?.transaction_type)) {
+        return send(res, 400, { ok: false, error: 'candidate_missing_city_or_transaction', version: VERSION });
+      }
+      const result = await verifyQuinto(candidate, {
+        token: config.apifyToken,
+        taskId: config.apifyTasks?.quinto || '',
+        timeoutMs: config.requestTimeoutMs,
+        timeoutSecs: config.apifyTimeoutSecs,
+        maxChargeUsd: config.apifyMaxChargeUsd,
+      });
+      return send(res, 200, { ...result, router_version: VERSION, verifier_mode: 'positive_match_only' });
     }
 
     const validation = validateRequest(body);
