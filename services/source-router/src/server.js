@@ -3,6 +3,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 
+const VERSION = '1.1.1';
+
 function send(res, status, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
@@ -32,42 +34,51 @@ async function readJson(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function healthPayload() {
+  const sources = {
+    mercadolivre: config.mercadoLivreToken ? 'ready' : 'needs_token',
+    threads: config.threadsToken ? 'ready' : 'needs_token',
+  };
+  return {
+    ok: true,
+    service: 'lji-source-router',
+    version: VERSION,
+    configured: {
+      router_token: Boolean(config.routerToken),
+      mercadolivre: Boolean(config.mercadoLivreToken),
+      threads: Boolean(config.threadsToken),
+    },
+    collection_ready: Boolean(config.routerToken && (config.mercadoLivreToken || config.threadsToken)),
+    sources,
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (req.method === 'GET' && url.pathname === '/health') {
-      const sources = {
-        mercadolivre: config.mercadoLivreToken ? 'ready' : 'needs_token',
-        threads: config.threadsToken ? 'ready' : 'needs_token',
-      };
-      return send(res, 200, {
-        ok: true,
-        service: 'lji-source-router',
-        version: '1.1.0',
-        configured: {
-          router_token: Boolean(config.routerToken),
-          mercadolivre: Boolean(config.mercadoLivreToken),
-          threads: Boolean(config.threadsToken),
-        },
-        collection_ready: Boolean(config.routerToken && (config.mercadoLivreToken || config.threadsToken)),
-        sources,
-      });
+    console.log(`request ${req.method || 'UNKNOWN'} ${url.pathname}`);
+
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
+      return send(res, 200, healthPayload());
     }
-    if (req.method !== 'POST' || url.pathname !== '/collect') return send(res, 404, { ok: false, error: 'not_found' });
-    if (!authorized(req)) return send(res, 401, { ok: false, error: 'unauthorized' });
+
+    if (req.method !== 'POST' || url.pathname !== '/collect') {
+      return send(res, 404, { ok: false, error: 'not_found', version: VERSION });
+    }
+    if (!authorized(req)) return send(res, 401, { ok: false, error: 'unauthorized', version: VERSION });
 
     const body = await readJson(req);
     const validation = validateRequest(body);
-    if (!validation.ok) return send(res, 400, { ok: false, error: validation.error });
+    if (!validation.ok) return send(res, 400, { ok: false, error: validation.error, version: VERSION });
 
     const result = await routeCollection(validation.request, config);
     const status = result.ok ? 200 : result.status === 'not_configured' ? 503 : 502;
-    return send(res, status, result);
+    return send(res, status, { ...result, router_version: VERSION });
   } catch (error) {
-    return send(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    return send(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error), version: VERSION });
   }
 });
 
 server.listen(config.port, '0.0.0.0', () => {
-  console.log(`lji-source-router listening on 0.0.0.0:${config.port}`);
+  console.log(`lji-source-router ${VERSION} listening on 0.0.0.0:${config.port}`);
 });
