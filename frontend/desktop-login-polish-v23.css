@@ -1,5 +1,6 @@
 /* LJ Radar Imob — Login polish v23 · 08/09/2026
-   Ajustes aprovados: logo maior, locale sem falso affordance e miniaturas visuais nos cards. */
+   Ajustes aprovados: logo oficial em destaque, 3 oportunidades com imagem,
+   efeito visual futurista e suporte ao hover sonoro implementado em JS. */
 
 @media (min-width:901px){
   .lji-login-lang span{
@@ -7,30 +8,88 @@
     user-select:none;
   }
 
+  .lji-login-brand{
+    margin-bottom:8px!important;
+  }
+  .lji-login-brand h1{display:none!important;}
+  .lji-login-logo{
+    width:245px!important;
+    height:225px!important;
+    margin:0 auto -6px!important;
+    object-fit:contain!important;
+    filter:drop-shadow(0 9px 24px rgba(10,42,122,.08))!important;
+  }
+  .lji-login-brand > p{
+    margin-top:2px!important;
+  }
+
   .lji-login-float{
     display:grid!important;
-    grid-template-columns:58px minmax(105px,1fr)!important;
+    grid-template-columns:68px minmax(118px,1fr) 16px!important;
     align-items:center!important;
     gap:10px!important;
-    min-width:205px!important;
-    padding:8px 10px!important;
+    min-width:240px!important;
+    padding:9px 10px!important;
+    overflow:hidden!important;
+    cursor:pointer!important;
+    border:1px solid rgba(255,255,255,.78)!important;
+    background:linear-gradient(135deg,rgba(255,255,255,.94),rgba(242,248,255,.88))!important;
+    box-shadow:0 12px 30px rgba(32,67,117,.14), inset 0 1px 0 rgba(255,255,255,.92)!important;
+    transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,filter .22s ease!important;
   }
+  .lji-login-float::after{
+    content:"";
+    position:absolute;
+    inset:-80% -30%;
+    background:linear-gradient(112deg,transparent 38%,rgba(255,255,255,.72) 50%,transparent 62%);
+    transform:translateX(-70%);
+    transition:transform .55s ease;
+    pointer-events:none;
+  }
+  .lji-login-float:hover{
+    transform:translateY(-4px) scale(1.018)!important;
+    border-color:rgba(121,172,255,.78)!important;
+    box-shadow:0 18px 42px rgba(17,75,163,.20),0 0 0 1px rgba(75,134,230,.12),0 0 28px rgba(82,142,235,.16)!important;
+    filter:saturate(1.03)!important;
+  }
+  .lji-login-float:hover::after{transform:translateX(70%);}
+
   .lji-login-float .lji-float-thumb{
-    width:58px;
-    height:46px;
+    width:68px;
+    height:54px;
     border-radius:9px;
     overflow:hidden;
+    display:block;
     background-image:url('./banner-cidade-exata.jpg');
-    background-size:330% auto;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 3px 10px rgba(18,53,105,.10);
+    background-size:350% auto;
+    background-repeat:no-repeat;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.65),0 4px 12px rgba(18,53,105,.13);
+    transition:transform .28s ease,filter .28s ease;
+  }
+  .lji-login-float:hover .lji-float-thumb{
+    transform:scale(1.045);
+    filter:contrast(1.03) saturate(1.06);
   }
   .lji-login-float .lji-float-copy{
     display:flex;
     flex-direction:column;
     min-width:0;
+    position:relative;
+    z-index:1;
   }
   .lji-login-float .lji-float-copy strong{
     margin:0!important;
+    white-space:nowrap;
+    color:#102b65!important;
+    font-size:12px!important;
+  }
+  .lji-login-float .lji-float-price{
+    margin-top:2px;
+    color:#0d388e;
+    font-size:11px;
+    line-height:1.2;
+    font-style:normal;
+    font-weight:800;
     white-space:nowrap;
   }
   .lji-login-float .lji-float-copy span{
@@ -38,35 +97,58 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
+    color:#7082a1!important;
+    font-size:9.5px!important;
   }
-  .lji-float-a .lji-float-thumb{background-position:78% 34%;}
-  .lji-float-b .lji-float-thumb{background-position:48% 55%;}
-  .lji-float-c .lji-float-thumb{background-position:22% 68%;}
+  .lji-float-arrow{
+    color:#174b9d;
+    font-size:24px;
+    font-style:normal;
+    line-height:1;
+    position:relative;
+    z-index:1;
+    opacity:.78;
+  }
+
+  /* Três recortes visuais distintos, usando o asset local para evitar dependência externa. */
+  .lji-thumb-apt{background-position:82% 30%!important;}
+  .lji-thumb-house{background-position:48% 54%!important;}
+  .lji-thumb-land{background-position:15% 72%!important;}
+
+  .lji-float-a{right:3.2%!important;top:18.5%!important;}
+  .lji-float-b{right:30%!important;top:42%!important;}
+  .lji-float-c{right:5.5%!important;top:58.5%!important;}
+
+  .lji-login-hero-radar{
+    transition:filter .25s ease,transform .25s ease;
+  }
+  .lji-login-hero-radar:hover{
+    filter:drop-shadow(0 0 18px rgba(121,176,255,.24));
+    transform:translateZ(0) scale(1.015);
+  }
 }
 
 @media (min-width:901px) and (max-height:960px){
   .lji-login-logo{
-    width:225px!important;
-    height:185px!important;
-    margin-bottom:-12px!important;
+    width:235px!important;
+    height:205px!important;
+    margin-bottom:-10px!important;
   }
-  .lji-login-brand{
-    margin-bottom:8px!important;
-  }
+  .lji-login-brand{margin-bottom:4px!important;}
   .lji-float-a{right:2.5%!important;}
   .lji-float-b{right:27%!important;}
-  .lji-float-c{right:30%!important;}
+  .lji-float-c{right:4.5%!important;}
 }
 
 @media (min-width:901px) and (max-height:820px){
   .lji-login-logo{
-    width:185px!important;
-    height:152px!important;
+    width:205px!important;
+    height:176px!important;
     margin-bottom:-10px!important;
   }
   .lji-login-float{
-    grid-template-columns:50px minmax(100px,1fr)!important;
-    min-width:185px!important;
+    grid-template-columns:58px minmax(105px,1fr) 14px!important;
+    min-width:210px!important;
   }
-  .lji-login-float .lji-float-thumb{width:50px;height:40px;}
+  .lji-login-float .lji-float-thumb{width:58px;height:46px;}
 }
