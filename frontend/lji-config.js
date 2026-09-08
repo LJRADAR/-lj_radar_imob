@@ -30,6 +30,13 @@ window.LJI_CONFIG = {
     css.dataset.ljiDesktopV23 = '1';
     document.head.appendChild(css);
   }
+  if (!document.querySelector('link[data-lji-desktop-v23-hotfix]')) {
+    const cssFix = document.createElement('link');
+    cssFix.rel = 'stylesheet';
+    cssFix.href = 'desktop-layout-v23-hotfix.css?v=20260908-1';
+    cssFix.dataset.ljiDesktopV23Hotfix = '1';
+    document.head.appendChild(cssFix);
+  }
   if (!document.querySelector('script[data-lji-desktop-v23]')) {
     const ui = document.createElement('script');
     ui.src = 'desktop-layout-v23.js?v=20260908-1';
