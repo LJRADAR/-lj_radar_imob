@@ -20,6 +20,26 @@ window.LJI_CONFIG = {
   ]
 };
 
+// Layout desktop aprovado em 08/09/2026. Carregado como camada isolada para
+// preservar toda a operação existente e manter o mobile atual até a fase dedicada.
+(function loadDesktopV23(){
+  if (!document.querySelector('link[data-lji-desktop-v23]')) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'desktop-layout-v23.css?v=20260908-1';
+    css.dataset.ljiDesktopV23 = '1';
+    document.head.appendChild(css);
+  }
+  if (!document.querySelector('script[data-lji-desktop-v23]')) {
+    const ui = document.createElement('script');
+    ui.src = 'desktop-layout-v23.js?v=20260908-1';
+    ui.async = false;
+    ui.dataset.ljiDesktopV23 = '1';
+    ui.onerror = () => console.error('LJ Radar: desktop-layout-v23.js não carregou.');
+    document.head.appendChild(ui);
+  }
+})();
+
 // Camadas pequenas e isoladas carregadas depois que app-core.js/app-backend.js
 // já definiram as funções. Evita reescrever o arquivo principal e reduz regressão.
 window.addEventListener('load', () => {
