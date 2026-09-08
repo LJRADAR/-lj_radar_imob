@@ -4,6 +4,7 @@ import {
   canonicalSourceKey,
   filterQualifiedRows,
   isObviousProfessionalAdvertiser,
+  professionalAdvertiserReason,
   sourceUrlAllowed,
 } from '../src/quality.js';
 
@@ -25,6 +26,13 @@ test('professional seller types and names are rejected', () => {
   assert.equal(isObviousProfessionalAdvertiser({ seller_nickname: 'Maria', description: 'Vendo meu apartamento direto.' }), false);
 });
 
+test('professional advertiser diagnostics identify the first decisive signal', () => {
+  assert.equal(professionalAdvertiserReason({ seller_type: 'business', seller_nickname: 'Maria' }), 'seller_type');
+  assert.equal(professionalAdvertiserReason({ seller_nickname: 'ABC Imóveis' }), 'seller_name');
+  assert.equal(professionalAdvertiserReason({ seller_nickname: 'João', description: 'CRECI 12345-F' }), 'description');
+  assert.equal(professionalAdvertiserReason({ seller_nickname: 'Maria', description: 'Vendo meu apartamento direto.' }), null);
+});
+
 test('group-like title does not by itself classify the advertiser as professional', () => {
   assert.equal(isObviousProfessionalAdvertiser({
     seller_nickname: null,
@@ -34,16 +42,24 @@ test('group-like title does not by itself classify the advertiser as professiona
   }), false);
 });
 
-test('filterQualifiedRows rejects wrong domains and professional advertisers', () => {
+test('filterQualifiedRows rejects wrong domains and explains professional evidence', () => {
   const rows = [
     { source_url: 'https://www.olx.com.br/imovel/1', seller_nickname: 'Maria' },
     { source_url: 'https://www.olx.com.br/imovel/2', seller_type: 'professional' },
-    { source_url: 'https://example.com/imovel/3', seller_nickname: 'João' },
+    { source_url: 'https://www.olx.com.br/imovel/3', seller_nickname: 'ABC Imóveis' },
+    { source_url: 'https://www.olx.com.br/imovel/4', seller_nickname: 'João', description: 'CRECI 12345-F' },
+    { source_url: 'https://example.com/imovel/5', seller_nickname: 'João' },
   ];
   const result = filterQualifiedRows(rows, 'olx');
   assert.equal(result.accepted.length, 1);
-  assert.equal(result.rejected_count, 2);
-  assert.deepEqual(result.rejection_reasons, { wrong_domain: 1, professional_advertiser: 1 });
+  assert.equal(result.rejected_count, 4);
+  assert.deepEqual(result.rejection_reasons, {
+    wrong_domain: 1,
+    professional_advertiser: 3,
+    professional_seller_type: 1,
+    professional_seller_name: 1,
+    professional_description: 1,
+  });
 });
 
 test('canonicalSourceKey removes tracking noise but preserves identifying query params', () => {
