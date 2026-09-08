@@ -37,14 +37,18 @@ const PROFESSIONAL_TYPE = /\b(business|professional|dealer|agency|company|store|
 const PROFESSIONAL_NAME = /\b(imobiliaria|imoveis|creci|corretor|corretora|empreendimentos|incorporadora|construtora|real estate|properties)\b/;
 const PROFESSIONAL_EVIDENCE = /\b(creci|corretor|corretora|imobiliaria|construtora|incorporadora|consultor imobiliario|consultoria imobiliaria|assessoria imobiliaria)\b/;
 
-export function isObviousProfessionalAdvertiser(row) {
+export function professionalAdvertiserReason(row) {
   const type = norm(row?.seller_type ?? row?.attributes?.seller_type);
   const seller = norm(row?.seller_nickname ?? row?.seller_name);
   const evidence = norm(`${row?.description || ''}`);
-  if (type && PROFESSIONAL_TYPE.test(type)) return true;
-  if (seller && PROFESSIONAL_NAME.test(seller)) return true;
-  if (evidence && PROFESSIONAL_EVIDENCE.test(evidence)) return true;
-  return false;
+  if (type && PROFESSIONAL_TYPE.test(type)) return 'seller_type';
+  if (seller && PROFESSIONAL_NAME.test(seller)) return 'seller_name';
+  if (evidence && PROFESSIONAL_EVIDENCE.test(evidence)) return 'description';
+  return null;
+}
+
+export function isObviousProfessionalAdvertiser(row) {
+  return Boolean(professionalAdvertiserReason(row));
 }
 
 export function canonicalSourceKey(value) {
@@ -63,18 +67,32 @@ export function canonicalSourceKey(value) {
 
 export function filterQualifiedRows(rows, source) {
   const accepted = [];
-  const rejected = { wrong_domain: 0, professional_advertiser: 0 };
+  const rejected = {
+    wrong_domain: 0,
+    professional_advertiser: 0,
+    professional_seller_type: 0,
+    professional_seller_name: 0,
+    professional_description: 0,
+  };
+
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!sourceUrlAllowed(row?.source_url, source)) {
       rejected.wrong_domain += 1;
       continue;
     }
-    if (isObviousProfessionalAdvertiser(row)) {
+
+    const professionalReason = professionalAdvertiserReason(row);
+    if (professionalReason) {
       rejected.professional_advertiser += 1;
+      if (professionalReason === 'seller_type') rejected.professional_seller_type += 1;
+      if (professionalReason === 'seller_name') rejected.professional_seller_name += 1;
+      if (professionalReason === 'description') rejected.professional_description += 1;
       continue;
     }
+
     accepted.push(row);
   }
+
   return {
     accepted,
     rejected_count: rejected.wrong_domain + rejected.professional_advertiser,
