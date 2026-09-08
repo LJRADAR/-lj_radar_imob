@@ -21,6 +21,10 @@ const OLX_SEARCH_TARGETS = {
   'São Paulo Zona Norte': 'Zona Norte São Paulo SP',
 };
 
+const FACEBOOK_GROUP_URLS = [
+  'https://www.facebook.com/groups/alugarzonaleste',
+];
+
 function text(value) {
   const v = String(value ?? '').trim();
   return v || null;
@@ -122,6 +126,14 @@ export function buildTaskInput(request, source, maxItems) {
     };
   }
 
+  if (source === 'facebook') {
+    return {
+      resultsLimit: maxItems,
+      startUrls: FACEBOOK_GROUP_URLS.map((url) => ({ url })),
+      viewOption: 'CHRONOLOGICAL',
+    };
+  }
+
   return {
     lj_request: {
       state_code: request.state_code,
@@ -143,9 +155,9 @@ function normalizeItem(item, request, source) {
   const actualCity = text(first(item, ['city', 'locationCity', 'municipality']));
   const neighborhood = text(first(item, ['neighborhood', 'neighbourhood', 'bairro', 'district']));
   if (source === 'olx' && (!actualCity || !locationMatchesTarget(request.city, actualCity, neighborhood || ''))) return null;
-  const city = actualCity || request.city;
-  const publishedAt = text(first(item, ['published_at', 'publishedAt', 'postedAt', 'timestamp', 'date', 'createdAt', 'takenAtIso']));
-  const seller = text(nested(item, ['seller.name', 'seller.username', 'owner.username', 'owner.fullName']))
+  const city = actualCity || (source === 'olx' ? request.city : null);
+  const publishedAt = text(first(item, ['published_at', 'publishedAt', 'postedAt', 'timestamp', 'time', 'date', 'createdAt', 'takenAtIso']));
+  const seller = text(nested(item, ['seller.name', 'seller.username', 'owner.username', 'owner.fullName', 'user.name']))
     || text(first(item, ['sellerName', 'username', 'ownerName', 'author', 'ownerUsername']));
   const sellerType = text(nested(item, ['seller.type'])) || text(first(item, ['sellerType', 'accountType']));
   const sourceItemId = text(first(item, ['source_item_id', 'id', 'postId', 'listingId', 'shortcode', 'shortCode'])) || url;
@@ -176,7 +188,7 @@ function normalizeItem(item, request, source) {
     transaction_type: request.transaction_type,
     property_type: normalizePropertyType(request.property_type_code) || normalizePropertyType(category),
     published_at: publishedAt,
-    seller_id: text(nested(item, ['seller.id', 'owner.id'])) || seller,
+    seller_id: text(nested(item, ['seller.id', 'owner.id', 'user.id'])) || seller,
     seller_nickname: seller,
     seller_type: sellerType,
     area_m2: areaM2,
@@ -192,6 +204,7 @@ function normalizeItem(item, request, source) {
       phone_available: nested(item, ['seller.phoneAvailable']) ?? first(item, ['phoneAvailable', 'hasPhone']) ?? null,
       postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
       category_name: text(first(item, ['categoryName', 'category'])),
+      facebook_group_url: text(first(item, ['facebookUrl'])),
       properties,
       requested_target: request.city,
       requested_transaction_type: request.transaction_type,
@@ -201,7 +214,11 @@ function normalizeItem(item, request, source) {
       official_api: false,
       exact_city_or_zone: source === 'olx',
       task_normalized: true,
-      source_profile: source === 'olx' ? 'solidcode/olx-brazil-scraper' : 'curated_task',
+      source_profile: source === 'olx'
+        ? 'solidcode/olx-brazil-scraper'
+        : source === 'facebook'
+          ? 'apify/facebook-groups-scraper'
+          : 'curated_task',
     },
     raw_apify: item,
   };
