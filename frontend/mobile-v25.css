@@ -1,0 +1,160 @@
+/* LJ Radar Imob — Mobile v25 · 08/09/2026
+   Identidade mobile completa: login, dashboard, navegação e módulos.
+   Preserva toda a operação existente; aplica somente em telas <= 900px. */
+
+@media (max-width:900px){
+  :root{
+    --mnavy:#0a2a7a;
+    --mblue:#1559d6;
+    --mblue2:#2f70e5;
+    --mink:#10224a;
+    --mmuted:#7283a5;
+    --mline:#dfe8f4;
+    --msoft:#f4f8fd;
+    --msoft2:#edf4fc;
+    --mcard:#fff;
+    --mshadow:0 10px 28px rgba(25,58,111,.08);
+  }
+
+  html.lji-mobile-v25,html.lji-mobile-v25 body{background:#f6f9fd!important;color:var(--mink)!important;}
+  body.lji-mobile-v25{padding-bottom:82px!important;overflow-x:hidden!important;}
+  body.lji-mobile-v25 .app{display:block!important;min-height:100vh!important;background:#f6f9fd!important;}
+  body.lji-mobile-v25 .sidebar{display:none!important;}
+  body.lji-mobile-v25 main{padding:68px 10px 92px!important;max-width:100vw!important;overflow:hidden!important;}
+
+  /* ---------- LOGIN MOBILE ---------- */
+  .auth-overlay.lji-mobile-login-v25{
+    position:fixed!important;inset:0!important;z-index:100000!important;
+    padding:0!important;display:block!important;background:#fff!important;
+    overflow:auto!important;backdrop-filter:none!important;
+  }
+  .auth-overlay.lji-mobile-login-v25.hidden{display:none!important;}
+  .lji-m-login-shell{min-height:100dvh;background:linear-gradient(180deg,#eef5ff 0,#fff 36%);display:flex;flex-direction:column;}
+  .lji-m-login-hero{position:relative;height:250px;min-height:250px;overflow:hidden;background:
+      linear-gradient(180deg,rgba(222,237,255,.24) 0%,rgba(13,47,101,.35) 100%),
+      linear-gradient(90deg,rgba(255,255,255,.26),rgba(255,255,255,.04)),
+      url('./banner-cidade-exata.jpg') center/cover no-repeat;}
+  .lji-m-login-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(7,32,75,.28));pointer-events:none;}
+  .lji-m-login-locale{position:absolute;z-index:3;right:16px;top:14px;display:flex;align-items:center;gap:10px;color:#fff;font-size:10px;font-weight:800;text-shadow:0 2px 7px rgba(0,0,0,.2)}
+  .lji-m-login-locale i{height:14px;width:1px;background:rgba(255,255,255,.55)}
+  .lji-m-login-copy{position:absolute;z-index:3;left:20px;right:92px;bottom:22px;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.2)}
+  .lji-m-login-copy small{font-size:8px;letter-spacing:.24em;font-weight:800;opacity:.88}
+  .lji-m-login-copy h1{margin:9px 0 7px;font-size:25px;line-height:1.04;font-weight:400;letter-spacing:-.03em}
+  .lji-m-login-copy h1 strong{font-weight:850}
+  .lji-m-login-copy p{margin:0;font-size:7.5px;line-height:1.5;letter-spacing:.12em;font-weight:800;opacity:.88}
+  .lji-m-radar{position:absolute;z-index:3;right:5px;bottom:22px;width:112px;height:112px;border-radius:50%;}
+  .lji-m-radar::before,.lji-m-radar::after,.lji-m-radar i{content:"";position:absolute;border:1px solid rgba(255,255,255,.66);border-radius:50%;inset:0}
+  .lji-m-radar::after{inset:24px}.lji-m-radar i:nth-child(1){inset:12px}.lji-m-radar i:nth-child(2){inset:35px}.lji-m-radar i:nth-child(3){inset:47px}
+  .lji-m-radar b{position:absolute;left:50%;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);background:#1e61d3;border:3px solid #fff;box-shadow:0 0 0 7px rgba(255,255,255,.15)}
+  .lji-m-login-cardwrap{position:relative;z-index:4;margin-top:-18px;padding:0 14px 28px;display:flex;flex-direction:column;align-items:center;}
+  .auth-overlay.lji-mobile-login-v25 .auth-card{width:100%!important;max-width:520px!important;margin:0!important;padding:20px 18px 18px!important;border:1px solid rgba(88,126,184,.17)!important;border-radius:20px!important;background:rgba(255,255,255,.98)!important;box-shadow:0 18px 46px rgba(25,58,111,.16)!important;backdrop-filter:blur(16px)!important;}
+  .auth-overlay.lji-mobile-login-v25 .auth-brand[hidden],.auth-overlay.lji-mobile-login-v25 .auth-card>p[hidden]{display:none!important;}
+  .lji-m-brand{text-align:center;margin:-5px 0 13px;}
+  .lji-m-brand img{display:block;width:150px;height:132px;object-fit:contain;margin:0 auto -7px;filter:drop-shadow(0 6px 16px rgba(10,42,122,.08))}
+  .lji-m-brand p{margin:0!important;color:#6f82a6!important;font-size:11px!important;line-height:1.35!important;}
+  .auth-overlay.lji-mobile-login-v25 .auth-field{margin-bottom:12px!important;}
+  .auth-overlay.lji-mobile-login-v25 .auth-field label{display:block!important;margin-bottom:6px!important;font-size:11px!important;color:#153266!important;font-weight:800!important;}
+  .auth-overlay.lji-mobile-login-v25 .auth-field input{width:100%!important;min-height:48px!important;padding:11px 13px!important;border:1px solid #cfdced!important;border-radius:11px!important;background:#fff!important;color:#18315f!important;font-size:15px!important;}
+  .auth-overlay.lji-mobile-login-v25 .password-visibility{color:#2356aa!important;}
+  .lji-m-login-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;}
+  .lji-m-login-controls label{display:flex;align-items:center;gap:8px;color:#24406f;font-size:11px;}
+  .lji-m-login-controls label input{position:absolute;opacity:0}
+  .lji-m-login-controls label span{width:19px;height:19px;border-radius:5px;border:1px solid #9cb1d3;background:#fff;position:relative;}
+  .lji-m-login-controls label input:checked+span{background:#1558cc;border-color:#1558cc}
+  .lji-m-login-controls label input:checked+span::after{content:"";position:absolute;left:5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .auth-overlay.lji-mobile-login-v25 .auth-forgot{margin:0!important;font-size:11px!important;color:#0d50b6!important;font-weight:800!important;text-decoration:underline!important;}
+  .auth-overlay.lji-mobile-login-v25 #ljiAuthLogin.primary{width:100%!important;min-height:50px!important;border:0!important;border-radius:11px!important;background:linear-gradient(90deg,#0b2b75,#1558c9)!important;color:#fff!important;font-size:15px!important;font-weight:850!important;box-shadow:0 10px 22px rgba(21,82,190,.2)!important;}
+  .auth-overlay.lji-mobile-login-v25 #ljiAuthLogin.primary::after{content:" →";margin-left:8px}
+  .lji-m-divider{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;color:#8493af;margin:13px 0 10px}.lji-m-divider i{height:1px;background:#dce6f2}.lji-m-divider b{font-size:10px}
+  .lji-m-request{width:100%;min-height:45px;border:1px solid #5e88df;border-radius:10px;background:#fff;color:#123b89;font-size:12px;font-weight:800}
+  .lji-m-support{margin:14px auto 0;border:0;background:transparent;color:#7183a3;font-size:11px;font-weight:800}
+  .auth-overlay.lji-mobile-login-v25 .auth-info{margin-top:10px!important;border-radius:9px!important;background:#f4f7fc!important;color:#667694!important;font-size:10px!important;}
+
+  /* ---------- APP BAR ---------- */
+  .lji-mobile-appbar{position:fixed;z-index:8500;left:0;right:0;top:0;height:58px;padding:7px 10px calc(7px + env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.95);backdrop-filter:blur(18px);border-bottom:1px solid #e3eaf4;box-shadow:0 5px 20px rgba(25,58,111,.05)}
+  .lji-mobile-appbar .brand{border:0;background:transparent;padding:0;display:flex;align-items:center;gap:8px;color:var(--mink);min-width:0;text-align:left}
+  .lji-mobile-appbar .brand img{width:42px;height:42px;object-fit:contain;flex:0 0 42px}
+  .lji-mobile-appbar .brand span{display:flex;flex-direction:column;min-width:0}.lji-mobile-appbar .brand strong{font-size:12px;color:#0b2b70;white-space:nowrap}.lji-mobile-appbar .brand small{font-size:9px;color:#7a8aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:138px}
+  .lji-mobile-appbar .actions{display:flex;align-items:center;gap:5px}.lji-mobile-appbar .actions>button{position:relative;width:37px;height:37px;border:0;border-radius:11px;background:#f3f7fc;color:#244c94;display:grid;place-items:center;font-size:17px}
+  .lji-mobile-appbar .profile span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#0b2e78,#2f6fe4);color:#fff;font-size:9px;font-weight:900}
+  .lji-mobile-appbar .alert b{position:absolute;right:2px;top:1px;min-width:14px;height:14px;padding:0 3px;border-radius:999px;background:#e84f66;color:#fff;font-size:7px;display:grid;place-items:center}
+
+  /* ---------- BOTTOM NAV ---------- */
+  .mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(5,1fr)!important;position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:9000!important;height:72px!important;padding:5px 7px calc(6px + env(safe-area-inset-bottom))!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(20px)!important;border-top:1px solid #dfe7f2!important;box-shadow:0 -8px 24px rgba(25,58,111,.09)!important;}
+  .mobile-bottom-nav button{border:0!important;background:transparent!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;min-height:55px!important;border-radius:12px!important;color:#66758f!important;transition:.16s ease!important;}
+  .mobile-bottom-nav button span{font-size:19px!important;line-height:1!important}.mobile-bottom-nav button b{font-size:8.5px!important;font-weight:800!important;}
+  .mobile-bottom-nav button.active,.mobile-bottom-nav button:active{color:#1155c6!important;background:#eff5ff!important;}
+  .mobile-bottom-nav .mobile-nav-inbox span{font-size:18px!important}.mobile-bottom-nav .mobile-nav-radar span{font-size:20px!important}.mobile-bottom-nav .mobile-nav-match span{font-size:20px!important}
+
+  /* ---------- MORE SHEET ---------- */
+  .mobile-more-sheet{position:fixed!important;inset:0!important;z-index:9100!important;background:rgba(10,25,52,.38)!important;align-items:flex-end!important;backdrop-filter:blur(4px)!important;}
+  .mobile-more-sheet:not(.hidden){display:flex!important;}
+  .mobile-more-panel{width:100%!important;max-height:82dvh!important;overflow:auto!important;background:#f7faff!important;border-radius:24px 24px 0 0!important;padding:11px 12px calc(22px + env(safe-area-inset-bottom))!important;box-shadow:0 -18px 46px rgba(12,36,79,.22)!important;}
+  .mobile-more-panel::before{content:"";display:block;width:42px;height:4px;border-radius:9px;background:#c7d2e4;margin:0 auto 10px}
+  .mobile-more-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;margin-bottom:12px!important;}
+  .mobile-more-head>button{border:0!important;background:#eaf1fb!important;border-radius:11px!important;width:38px!important;height:38px!important;color:#315790!important;font-size:20px!important;}
+  .lji-m-sheet-brand{display:flex;align-items:center;gap:8px}.lji-m-sheet-brand img{width:50px;height:50px;object-fit:contain}.lji-m-sheet-brand span{display:flex;flex-direction:column}.lji-m-sheet-brand strong{font-size:13px;color:#0c2d70}.lji-m-sheet-brand small{font-size:9px;color:#7b8da9;margin-top:1px}
+  .mobile-menu-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;}
+  .mobile-menu-grid button{min-height:64px!important;border:1px solid #e0e8f3!important;background:#fff!important;border-radius:14px!important;padding:10px!important;text-align:left!important;color:#203a68!important;display:grid!important;grid-template-columns:28px 1fr auto!important;align-items:center!important;gap:7px!important;box-shadow:0 4px 14px rgba(25,58,111,.035)!important;}
+  .mobile-menu-grid button>span{width:28px;height:28px;border-radius:9px;background:#edf4ff;color:#1658c7;display:grid;place-items:center;font-size:15px}.mobile-menu-grid button>b{font-size:10.5px;line-height:1.2}.mobile-menu-grid button>i{font-style:normal;color:#95a4bd;font-size:18px}.mobile-menu-grid button.active{border-color:#7ca6ef!important;background:#f2f7ff!important;}
+
+  /* ---------- DASHBOARD MOBILE ---------- */
+  #dashboard.lji-mobile-dashboard-host{padding:0!important;background:transparent!important;overflow:visible!important;}
+  #dashboard.lji-mobile-dashboard-host>:not(.lji-mobile-dashboard){display:none!important;}
+  .lji-mobile-dashboard{display:grid;gap:10px;padding:2px 0 6px;}
+  .lji-m-greeting{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:6px 4px 1px;}
+  .lji-m-greeting small{font-size:10px;color:#7283a5;font-weight:800}.lji-m-greeting h1{margin:1px 0 2px;font-size:22px;line-height:1;color:#102c68;letter-spacing:-.03em}.lji-m-greeting h1 span{font-weight:850}.lji-m-greeting h1 i{font-style:normal;font-size:18px}.lji-m-greeting p{margin:0;color:#7c8baa;font-size:9.5px}.lji-m-greeting>button{width:36px;height:36px;border:1px solid #e0e8f2;border-radius:11px;background:#fff;color:#315898;box-shadow:var(--mshadow)}
+
+  .lji-m-kpis{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:1px 1px 5px;scrollbar-width:none}.lji-m-kpis::-webkit-scrollbar{display:none}
+  .lji-m-kpis button{scroll-snap-align:start;flex:0 0 128px;min-height:104px;border:1px solid #e1e9f4;border-radius:15px;background:#fff;padding:11px;text-align:left;color:var(--mink);box-shadow:0 5px 16px rgba(25,58,111,.045)}
+  .lji-m-kpis button>span{width:31px;height:31px;border-radius:10px;background:#edf4ff;color:#1558c9;display:grid;place-items:center;font-size:16px;margin-bottom:8px}.lji-m-kpis button>span.wa{color:#159b5d;background:#ebfaf2}.lji-m-kpis button small{display:block;color:#7383a0;font-size:8.5px}.lji-m-kpis button strong{display:block;color:#0d2d72;font-size:20px;margin-top:3px;line-height:1}
+
+  .lji-m-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.lji-m-quick button{border:1px solid #e1e9f3;background:#fff;border-radius:13px;padding:9px 4px 8px;color:#244575;box-shadow:0 4px 14px rgba(25,58,111,.035)}.lji-m-quick button span{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;margin:0 auto 5px;background:#edf4ff;color:#1558c7;font-size:16px}.lji-m-quick button b{display:block;font-size:8px;line-height:1.15}
+
+  .lji-m-card{background:#fff;border:1px solid #e1e9f3;border-radius:17px;padding:12px;box-shadow:var(--mshadow);min-width:0;overflow:hidden}
+  .lji-m-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.lji-m-card>header>div{display:flex;align-items:center;gap:8px;min-width:0}.lji-m-card .icon{width:31px;height:31px;border-radius:10px;background:#edf4ff;color:#1558c7;display:grid;place-items:center;font-size:16px;flex:0 0 31px}.lji-m-card h2{margin:0;color:#102e6d;font-size:13px}.lji-m-card header p{margin:2px 0 0;color:#8391ab;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}.lji-m-card>header>button{border:0;background:transparent;color:#1759c7;font-size:8.5px;font-weight:800;white-space:nowrap}
+
+  .lji-m-inbox .actions{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:5px;margin-bottom:8px}.lji-m-inbox .actions button{min-height:32px;border:0;border-radius:9px;background:#edf4ff;color:#1557c4;font-size:8px;font-weight:800}.lji-m-inbox .actions .danger{background:#fff1f3;color:#c14a62}
+  .lji-m-inbox .body{border:1px solid #e6edf6;border-radius:12px;overflow:hidden}.lji-m-inbox .row{width:100%;display:grid;grid-template-columns:24px minmax(0,1fr) auto 14px;align-items:center;gap:7px;border:0;border-top:1px solid #edf1f6;background:#fff;padding:9px 7px;text-align:left;color:var(--mink)}.lji-m-inbox .row:first-child{border-top:0}.lji-m-inbox .row.tint{background:#f5f9ff}.lji-m-inbox .row label input{display:none}.lji-m-inbox .row label span{width:17px;height:17px;border:1px solid #aabbd3;border-radius:4px;display:block;background:#fff}.lji-m-inbox .row label input:checked+span{background:#1558cc;border-color:#1558cc}.lji-m-inbox .row .main{display:flex;flex-direction:column;min-width:0}.lji-m-inbox .row .main strong{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lji-m-inbox .row .main small{font-size:7.5px;color:#8794aa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lji-m-inbox .row .source{padding:4px 6px;border-radius:999px;background:#edf4ff;color:#1857bf;font-size:7px;font-weight:800}.lji-m-inbox .row>i{font-style:normal;color:#93a3ba;font-size:16px}.lji-m-inbox .empty,.lji-m-opps .empty{padding:22px 10px;text-align:center;color:#8997ad;font-size:9px}
+
+  .lji-m-radar-card .viz{height:156px;position:relative;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#edf5ff,#dceafc);border:1px solid #dce7f4}.lji-m-radar-card .viz::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 75% 28%,rgba(75,133,221,.14),transparent 38%),linear-gradient(140deg,transparent 52%,rgba(255,255,255,.55));}.lji-m-radar-card .viz>i{position:absolute;border:1px solid rgba(40,98,188,.25);border-radius:50%;width:145px;height:145px;right:20px;top:5px}.lji-m-radar-card .viz>i:nth-child(2){inset:auto 46px 30px auto;width:92px;height:92px}.lji-m-radar-card .viz>i:nth-child(3){inset:auto 70px 54px auto;width:45px;height:45px}.lji-m-radar-card .viz>b{position:absolute;right:86px;top:69px;width:12px;height:12px;border-radius:50%;background:#1959c5;border:3px solid #fff;box-shadow:0 0 0 7px rgba(25,89,197,.14)}.lji-m-radar-card .viz>span{position:absolute;left:14px;bottom:14px;display:flex;flex-direction:column}.lji-m-radar-card .viz>span strong{font-size:24px;color:#0d2f75}.lji-m-radar-card .viz>span small{font-size:8px;color:#7586a3;margin-top:1px}
+
+  .lji-m-opps .body{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.lji-m-opps .body::-webkit-scrollbar{display:none}.lji-m-opps .body>button{scroll-snap-align:start;flex:0 0 215px;display:grid;grid-template-columns:75px 1fr 12px;align-items:center;gap:8px;border:1px solid #e2eaf4;border-radius:13px;background:#fff;padding:7px;text-align:left;color:var(--mink)}.lji-m-opps .photo{width:75px;height:70px;border-radius:9px;background:#edf3fb url('./banner-cidade-exata.jpg') center/cover no-repeat}.lji-m-opps .body>button>span:nth-child(2){display:flex;flex-direction:column;min-width:0}.lji-m-opps small{font-size:7px;color:#7f90ab}.lji-m-opps strong{font-size:9.5px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lji-m-opps b{font-size:10px;color:#0e3a8a}.lji-m-opps button>i{font-style:normal;color:#93a3bb;font-size:16px}
+
+  .lji-m-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lji-m-card.mini{min-height:148px}.lji-m-card.mini .big{display:block;font-size:28px;color:#0d2f73;margin:14px 0}.lji-m-card.mini>button{border:0;background:#edf4ff;color:#1557c5;border-radius:9px;min-height:31px;width:100%;font-size:8px;font-weight:800}.lji-m-card.mini header p{max-width:100px}
+  .lji-m-funnel>div{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.lji-m-funnel>div>span{border-radius:10px;background:#f4f8fd;padding:8px 3px;text-align:center}.lji-m-funnel>div strong{display:block;color:#0e337d;font-size:14px}.lji-m-funnel>div small{display:block;color:#7d8ba5;font-size:6.8px;line-height:1.15;margin-top:2px}
+
+  .lji-m-modules{padding:2px 0 8px}.lji-m-modules>h2{font-size:12px;color:#17336d;margin:2px 3px 8px}.lji-m-modules>div{display:grid;grid-template-columns:1fr 1fr;gap:7px}.lji-m-modules button{min-height:58px;border:1px solid #e1e9f3;background:#fff;border-radius:13px;padding:9px;display:grid;grid-template-columns:29px 1fr auto;align-items:center;gap:7px;text-align:left;color:#253f6b;box-shadow:0 4px 14px rgba(25,58,111,.035)}.lji-m-modules button>span{width:29px;height:29px;border-radius:9px;background:#edf4ff;color:#1558c8;display:grid;place-items:center;font-size:14px}.lji-m-modules button>b{font-size:9px;line-height:1.15}.lji-m-modules button>i{font-style:normal;color:#9aa8bb;font-size:15px}
+
+  /* ---------- TODO O SISTEMA NO MOBILE ---------- */
+  body.lji-mobile-v25 main>section:not(#dashboard){padding:0!important;max-width:100%!important;overflow:visible!important;}
+  body.lji-mobile-v25 main>section:not(#dashboard)>.top,body.lji-mobile-v25 .top{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important;margin:2px 0 10px!important;}
+  body.lji-mobile-v25 .top .title h1,body.lji-mobile-v25 main>section>.title h1{font-size:20px!important;line-height:1.1!important;color:#102e6d!important;letter-spacing:-.025em!important;}
+  body.lji-mobile-v25 .top .title p,body.lji-mobile-v25 main>section>.title p{font-size:9px!important;color:#7c8da9!important;margin-top:4px!important;}
+  body.lji-mobile-v25 .card{border:1px solid #e1e9f3!important;border-radius:15px!important;background:#fff!important;box-shadow:0 7px 22px rgba(25,58,111,.055)!important;padding:12px!important;max-width:100%!important;overflow:auto!important;}
+  body.lji-mobile-v25 .section-head{gap:8px!important;align-items:flex-start!important}.section-head h2{font-size:13px!important;color:#18356f!important}.section-head .badge{font-size:7px!important;padding:4px 6px!important}
+  body.lji-mobile-v25 input,body.lji-mobile-v25 select,body.lji-mobile-v25 textarea{min-height:44px!important;border:1px solid #d5e0ed!important;border-radius:10px!important;background:#fff!important;color:#17305e!important;font-size:12px!important;padding:9px 10px!important;max-width:100%!important;}
+  body.lji-mobile-v25 button.primary{background:linear-gradient(90deg,#0b2b75,#1558cb)!important;color:#fff!important;border:0!important;border-radius:10px!important;min-height:42px!important;font-size:10px!important;font-weight:800!important;}
+  body.lji-mobile-v25 button.secondary{border:1px solid #d4e0ee!important;background:#fff!important;color:#24477e!important;border-radius:10px!important;min-height:40px!important;font-size:10px!important;}
+  body.lji-mobile-v25 .toolbar,body.lji-mobile-v25 .deep-toolbar,body.lji-mobile-v25 .owners-toolbar,body.lji-mobile-v25 .intent-toolbar,body.lji-mobile-v25 .registry-toolbar{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;}
+  body.lji-mobile-v25 .grid4,body.lji-mobile-v25 .ops-kpis,body.lji-mobile-v25 .whatsapp-kpis{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;}
+  body.lji-mobile-v25 .grid4>.card,body.lji-mobile-v25 .ops-kpis>.card,body.lji-mobile-v25 .whatsapp-kpis>.card{min-height:100px!important;}
+  body.lji-mobile-v25 .metric-value{font-size:22px!important;color:#0e337c!important}.metric-label,.metric-sub{font-size:8px!important}
+
+  body.lji-mobile-v25 table{font-size:9px!important;}
+  body.lji-mobile-v25 table th,body.lji-mobile-v25 table td{padding:8px 6px!important;}
+  body.lji-mobile-v25 .table-wrap,body.lji-mobile-v25 [id$="Table"],body.lji-mobile-v25 .deep-table{max-width:100%!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;}
+  body.lji-mobile-v25 #buyersTable table,body.lji-mobile-v25 #intentionsTable table,body.lji-mobile-v25 #intentMatchesTable table,body.lji-mobile-v25 #contactCheckTable table,body.lji-mobile-v25 #discardedTable table,body.lji-mobile-v25 #paraQuintoAndarTable table,body.lji-mobile-v25 #registrySearchesTable table,body.lji-mobile-v25 #adminUsersBody table{min-width:650px!important;}
+
+  body.lji-mobile-v25 .settings-panel{position:fixed!important;inset:0!important;z-index:9700!important;width:100%!important;max-width:none!important;height:100dvh!important;overflow:auto!important;border-radius:0!important;padding:70px 10px 90px!important;background:#f7faff!important;}
+  body.lji-mobile-v25 .settings-panel .settings-layout{display:block!important}.settings-panel .settings-nav{display:flex!important;flex-direction:row!important;overflow-x:auto!important;gap:6px!important;margin-bottom:9px!important;padding:7px!important;scrollbar-width:none}.settings-panel .settings-nav button{flex:0 0 auto!important;white-space:nowrap!important;border-radius:9px!important;font-size:9px!important;padding:9px 10px!important}.settings-panel .settings-close{position:fixed!important;right:12px!important;top:12px!important;z-index:9800!important;width:38px!important;height:38px!important;border-radius:11px!important;background:#edf4ff!important;color:#164eae!important;border:0!important}
+  body.lji-mobile-v25 .theme-grid{grid-template-columns:1fr 1fr!important}.theme-grid .theme{padding:9px!important}.theme-grid .swatch{height:42px!important}
+
+  .build-badge{left:6px!important;top:auto!important;bottom:80px!important;font-size:7px!important;padding:3px 6px!important;opacity:.55!important;}
+}
+
+@media (max-width:420px){
+  .lji-m-login-hero{height:225px;min-height:225px}.lji-m-login-copy{right:72px}.lji-m-login-copy h1{font-size:22px}.lji-m-radar{width:92px;height:92px;right:-4px}.lji-m-login-cardwrap{padding-left:10px;padding-right:10px}.lji-m-brand img{width:138px;height:120px}
+  .lji-mobile-appbar .brand small{max-width:112px}.lji-mobile-appbar .actions>button{width:34px;height:34px}.lji-mobile-appbar .actions{gap:3px}
+  .lji-m-quick{gap:4px}.lji-m-quick button{padding-left:2px;padding-right:2px}.lji-m-two{grid-template-columns:1fr 1fr}.lji-m-funnel>div{grid-template-columns:1fr 1fr}.lji-m-modules>div{grid-template-columns:1fr 1fr}
+}
