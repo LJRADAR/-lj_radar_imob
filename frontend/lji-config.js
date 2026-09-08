@@ -38,6 +38,14 @@ window.LJI_CONFIG = {
     ui.onerror = () => console.error('LJ Radar: desktop-layout-v23.js não carregou.');
     document.head.appendChild(ui);
   }
+  if (!document.querySelector('script[data-lji-desktop-logo-v23]')) {
+    const logo = document.createElement('script');
+    logo.src = 'desktop-logo-v23.js?v=20260908-2';
+    logo.async = false;
+    logo.dataset.ljiDesktopLogoV23 = '1';
+    logo.onerror = () => console.error('LJ Radar: desktop-logo-v23.js não carregou.');
+    document.head.appendChild(logo);
+  }
 })();
 
 // Camadas pequenas e isoladas carregadas depois que app-core.js/app-backend.js
