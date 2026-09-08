@@ -40,7 +40,7 @@ window.LJI_CONFIG = {
   if (!document.querySelector('link[data-lji-desktop-login-polish-v23]')) {
     const cssPolish = document.createElement('link');
     cssPolish.rel = 'stylesheet';
-    cssPolish.href = 'desktop-login-polish-v23.css?v=20260908-1';
+    cssPolish.href = 'desktop-login-polish-v23.css?v=20260908-4';
     cssPolish.dataset.ljiDesktopLoginPolishV23 = '1';
     document.head.appendChild(cssPolish);
   }
@@ -62,7 +62,7 @@ window.LJI_CONFIG = {
   }
   if (!document.querySelector('script[data-lji-desktop-login-polish-v23]')) {
     const polish = document.createElement('script');
-    polish.src = 'desktop-login-polish-v23.js?v=20260908-1';
+    polish.src = 'desktop-login-polish-v23.js?v=20260908-4';
     polish.async = false;
     polish.dataset.ljiDesktopLoginPolishV23 = '1';
     polish.onerror = () => console.error('LJ Radar: desktop-login-polish-v23.js não carregou.');
