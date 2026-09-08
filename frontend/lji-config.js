@@ -20,6 +20,24 @@ window.LJI_CONFIG = {
   ]
 };
 
+// Detecta dispositivo móvel de verdade. Não usa apenas window.innerWidth,
+// porque zoom/escala do Windows e janelas estreitas podem reduzir o viewport CSS
+// de um desktop e ativar o layout mobile indevidamente.
+const LJI_IS_MOBILE_DEVICE = (() => {
+  try {
+    const ua = navigator.userAgent || '';
+    const uaDataMobile = navigator.userAgentData?.mobile === true;
+    const mobileUA = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(ua);
+    const touchTablet = navigator.maxTouchPoints > 0
+      && window.matchMedia?.('(pointer: coarse)').matches
+      && Math.min(window.screen?.width || 9999, window.screen?.height || 9999) <= 1024;
+    return Boolean(uaDataMobile || mobileUA || touchTablet);
+  } catch (_) {
+    return false;
+  }
+})();
+window.LJI_IS_MOBILE_DEVICE = LJI_IS_MOBILE_DEVICE;
+
 // Identidade visual aprovada em 08/09/2026.
 // Desktop v23/v24 e Mobile v25 são camadas isoladas para preservar a operação existente.
 (function loadApprovedLayouts(){
@@ -51,10 +69,10 @@ window.LJI_CONFIG = {
     dashCss.dataset.ljiDashboardV24 = '1';
     document.head.appendChild(dashCss);
   }
-  if (!document.querySelector('link[data-lji-mobile-v25]')) {
+  if (LJI_IS_MOBILE_DEVICE && !document.querySelector('link[data-lji-mobile-v25]')) {
     const mobileCss = document.createElement('link');
     mobileCss.rel = 'stylesheet';
-    mobileCss.href = 'mobile-v25.css?v=20260908-1';
+    mobileCss.href = 'mobile-v25.css?v=20260908-2';
     mobileCss.dataset.ljiMobileV25 = '1';
     document.head.appendChild(mobileCss);
   }
@@ -90,9 +108,9 @@ window.LJI_CONFIG = {
     dash.onerror = () => console.error('LJ Radar: dashboard-v24.js não carregou.');
     document.head.appendChild(dash);
   }
-  if (!document.querySelector('script[data-lji-mobile-v25]')) {
+  if (LJI_IS_MOBILE_DEVICE && !document.querySelector('script[data-lji-mobile-v25]')) {
     const mobile = document.createElement('script');
-    mobile.src = 'mobile-v25.js?v=20260908-1';
+    mobile.src = 'mobile-v25.js?v=20260908-2';
     mobile.async = false;
     mobile.dataset.ljiMobileV25 = '1';
     mobile.onerror = () => console.error('LJ Radar: mobile-v25.js não carregou.');
