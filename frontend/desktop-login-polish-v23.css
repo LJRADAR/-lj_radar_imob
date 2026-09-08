@@ -1,0 +1,72 @@
+/* LJ Radar Imob — Login polish v23 · 08/09/2026
+   Ajustes aprovados: logo maior, locale sem falso affordance e miniaturas visuais nos cards. */
+
+@media (min-width:901px){
+  .lji-login-lang span{
+    cursor:default;
+    user-select:none;
+  }
+
+  .lji-login-float{
+    display:grid!important;
+    grid-template-columns:58px minmax(105px,1fr)!important;
+    align-items:center!important;
+    gap:10px!important;
+    min-width:205px!important;
+    padding:8px 10px!important;
+  }
+  .lji-login-float .lji-float-thumb{
+    width:58px;
+    height:46px;
+    border-radius:9px;
+    overflow:hidden;
+    background-image:url('./banner-cidade-exata.jpg');
+    background-size:330% auto;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 3px 10px rgba(18,53,105,.10);
+  }
+  .lji-login-float .lji-float-copy{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .lji-login-float .lji-float-copy strong{
+    margin:0!important;
+    white-space:nowrap;
+  }
+  .lji-login-float .lji-float-copy span{
+    margin-top:4px!important;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .lji-float-a .lji-float-thumb{background-position:78% 34%;}
+  .lji-float-b .lji-float-thumb{background-position:48% 55%;}
+  .lji-float-c .lji-float-thumb{background-position:22% 68%;}
+}
+
+@media (min-width:901px) and (max-height:960px){
+  .lji-login-logo{
+    width:225px!important;
+    height:185px!important;
+    margin-bottom:-12px!important;
+  }
+  .lji-login-brand{
+    margin-bottom:8px!important;
+  }
+  .lji-float-a{right:2.5%!important;}
+  .lji-float-b{right:27%!important;}
+  .lji-float-c{right:30%!important;}
+}
+
+@media (min-width:901px) and (max-height:820px){
+  .lji-login-logo{
+    width:185px!important;
+    height:152px!important;
+    margin-bottom:-10px!important;
+  }
+  .lji-login-float{
+    grid-template-columns:50px minmax(100px,1fr)!important;
+    min-width:185px!important;
+  }
+  .lji-login-float .lji-float-thumb{width:50px;height:40px;}
+}
