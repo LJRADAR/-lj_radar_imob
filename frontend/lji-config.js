@@ -20,9 +20,9 @@ window.LJI_CONFIG = {
   ]
 };
 
-// Layout desktop aprovado em 08/09/2026. Carregado como camada isolada para
-// preservar toda a operação existente e manter o mobile atual até a fase dedicada.
-(function loadDesktopV23(){
+// Identidade visual aprovada em 08/09/2026.
+// Desktop v23/v24 e Mobile v25 são camadas isoladas para preservar a operação existente.
+(function loadApprovedLayouts(){
   if (!document.querySelector('link[data-lji-desktop-v23]')) {
     const css = document.createElement('link');
     css.rel = 'stylesheet';
@@ -50,6 +50,13 @@ window.LJI_CONFIG = {
     dashCss.href = 'dashboard-v24.css?v=20260908-1';
     dashCss.dataset.ljiDashboardV24 = '1';
     document.head.appendChild(dashCss);
+  }
+  if (!document.querySelector('link[data-lji-mobile-v25]')) {
+    const mobileCss = document.createElement('link');
+    mobileCss.rel = 'stylesheet';
+    mobileCss.href = 'mobile-v25.css?v=20260908-1';
+    mobileCss.dataset.ljiMobileV25 = '1';
+    document.head.appendChild(mobileCss);
   }
   if (!document.querySelector('script[data-lji-desktop-v23]')) {
     const ui = document.createElement('script');
@@ -82,6 +89,14 @@ window.LJI_CONFIG = {
     dash.dataset.ljiDashboardV24 = '1';
     dash.onerror = () => console.error('LJ Radar: dashboard-v24.js não carregou.');
     document.head.appendChild(dash);
+  }
+  if (!document.querySelector('script[data-lji-mobile-v25]')) {
+    const mobile = document.createElement('script');
+    mobile.src = 'mobile-v25.js?v=20260908-1';
+    mobile.async = false;
+    mobile.dataset.ljiMobileV25 = '1';
+    mobile.onerror = () => console.error('LJ Radar: mobile-v25.js não carregou.');
+    document.head.appendChild(mobile);
   }
 })();
 
