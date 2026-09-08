@@ -44,6 +44,13 @@ window.LJI_CONFIG = {
     cssPolish.dataset.ljiDesktopLoginPolishV23 = '1';
     document.head.appendChild(cssPolish);
   }
+  if (!document.querySelector('link[data-lji-dashboard-v24]')) {
+    const dashCss = document.createElement('link');
+    dashCss.rel = 'stylesheet';
+    dashCss.href = 'dashboard-v24.css?v=20260908-1';
+    dashCss.dataset.ljiDashboardV24 = '1';
+    document.head.appendChild(dashCss);
+  }
   if (!document.querySelector('script[data-lji-desktop-v23]')) {
     const ui = document.createElement('script');
     ui.src = 'desktop-layout-v23.js?v=20260908-1';
@@ -67,6 +74,14 @@ window.LJI_CONFIG = {
     polish.dataset.ljiDesktopLoginPolishV23 = '1';
     polish.onerror = () => console.error('LJ Radar: desktop-login-polish-v23.js não carregou.');
     document.head.appendChild(polish);
+  }
+  if (!document.querySelector('script[data-lji-dashboard-v24]')) {
+    const dash = document.createElement('script');
+    dash.src = 'dashboard-v24.js?v=20260908-1';
+    dash.async = false;
+    dash.dataset.ljiDashboardV24 = '1';
+    dash.onerror = () => console.error('LJ Radar: dashboard-v24.js não carregou.');
+    document.head.appendChild(dash);
   }
 })();
 
