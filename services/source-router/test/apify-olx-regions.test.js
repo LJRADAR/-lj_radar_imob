@@ -30,3 +30,12 @@ test('returns null for target outside OLX pilot map', () => {
   const input = buildTaskInput({ ...base, city: 'Campinas', transaction_type: 'sale' }, 'olx', 50);
   assert.equal(input, null);
 });
+
+test('builds Facebook Groups input with the validated public owner group', () => {
+  const input = buildTaskInput({ ...base, city: 'Santo André', transaction_type: 'sale' }, 'facebook', 10);
+  assert.equal(input.resultsLimit, 10);
+  assert.deepEqual(input.startUrls, [
+    { url: 'https://www.facebook.com/groups/alugarzonaleste' },
+  ]);
+  assert.equal(input.viewOption, 'CHRONOLOGICAL');
+});
