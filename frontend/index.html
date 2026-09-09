@@ -11,28 +11,28 @@
 <script>
 (async function boot(){
   try{
-    const response = await fetch('./app-shell-v22.50.4.html?boot=20260909-2', {cache:'no-store'});
+    const response = await fetch('./app-shell-v22.50.4.html?boot=20260909-3', {cache:'no-store'});
     if(!response.ok) throw new Error('shell_http_'+response.status);
     let html = await response.text();
 
-    // Identificação inequívoca do pacote corrigido no Cloudflare.
-    html = html.replaceAll('?v=22.50.4','?v=26.2.0');
-    html = html.replace('v22.50.4 · Filtros de Qualidade','v26.2.0 · Desktop + Mobile');
-    html = html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v26.2.0 · © 2026');
-    html = html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v26.2.0 · approved layout late bootstrap · 09/09/2026 -->');
+    html = html.replaceAll('?v=22.50.4','?v=27.0.0');
+    html = html.replace('v22.50.4 · Filtros de Qualidade','v27.0.0 · Desktop + Mobile');
+    html = html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v27.0.0 · © 2026');
+    html = html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v27.0.0 · direct auth layout · 09/09/2026 -->');
 
-    // Estilos aprovados entram de forma estática; a composição visual é aplicada
-    // pelo bootstrap tardio depois que o app-auth montar o overlay real.
     const approvedHead = `
-<link rel="stylesheet" href="./desktop-layout-v23.css?v=20260909-2" data-lji-cf-desktop>
-<link rel="stylesheet" href="./desktop-layout-v23-hotfix.css?v=20260909-2" data-lji-cf-desktop-hotfix>
-<link rel="stylesheet" href="./desktop-login-polish-v23.css?v=20260909-2" data-lji-cf-login-polish>
-<link rel="stylesheet" href="./dashboard-v24.css?v=20260909-2" data-lji-cf-dashboard>
-<link rel="stylesheet" href="./mobile-v25.css?v=20260909-2" media="(max-width: 900px)" data-lji-cf-mobile>`;
+<link rel="stylesheet" href="./desktop-layout-v23.css?v=20260909-3" data-lji-cf-desktop>
+<link rel="stylesheet" href="./desktop-layout-v23-hotfix.css?v=20260909-3" data-lji-cf-desktop-hotfix>
+<link rel="stylesheet" href="./desktop-login-polish-v23.css?v=20260909-3" data-lji-cf-login-polish>
+<link rel="stylesheet" href="./dashboard-v24.css?v=20260909-3" data-lji-cf-dashboard>
+<link rel="stylesheet" href="./mobile-v25.css?v=20260909-3" media="(max-width: 900px)" data-lji-cf-mobile>`;
     html = html.replace('</head>', approvedHead + '\n</head>');
 
+    // O layout de autenticação é aplicado diretamente sobre o overlay real já
+    // criado pelo shell. Não depende mais da corrida entre app-auth e layouts auxiliares.
     const approvedTail = `
-<script src="./approved-layout-bootstrap-v26.js?v=20260909-2" data-lji-approved-bootstrap-v26><\/script>`;
+<script src="./auth-layout-direct-v27.js?v=20260909-3" data-lji-auth-direct-v27><\/script>
+<script src="./desktop-login-polish-v23.js?v=20260909-3" data-lji-cf-polish><\/script>`;
     html = html.replace('</body>', approvedTail + '\n</body>');
 
     document.open();
