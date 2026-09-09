@@ -112,7 +112,7 @@ function olxSearchQuery(request) {
   return `${property} ${operation} ${target}`;
 }
 
-export function buildTaskInput(request, source, maxItems) {
+export function buildTaskInput(request, source, maxItems, facebookGroupUrls = FACEBOOK_GROUP_URLS) {
   if (source === 'olx') {
     const searchQuery = olxSearchQuery(request);
     if (!searchQuery) return null;
@@ -127,9 +127,12 @@ export function buildTaskInput(request, source, maxItems) {
   }
 
   if (source === 'facebook') {
+    const groups = Array.isArray(facebookGroupUrls) && facebookGroupUrls.length
+      ? facebookGroupUrls
+      : FACEBOOK_GROUP_URLS;
     return {
       resultsLimit: maxItems,
-      startUrls: FACEBOOK_GROUP_URLS.map((url) => ({ url })),
+      startUrls: groups.map((url) => ({ url })),
       viewOption: 'CHRONOLOGICAL',
     };
   }
@@ -231,6 +234,7 @@ export async function collectApifyTask(request, {
   timeoutMs,
   timeoutSecs,
   maxChargeUsd,
+  facebookGroupUrls,
 }) {
   if (!token) {
     return { ok: false, status: 'not_configured', source, results: [], error: 'APIFY_TOKEN_missing' };
@@ -240,7 +244,7 @@ export async function collectApifyTask(request, {
   }
 
   const maxItems = Math.max(1, Math.min(80, Number(request.limit || 30)));
-  const taskInput = buildTaskInput(request, source, maxItems);
+  const taskInput = buildTaskInput(request, source, maxItems, facebookGroupUrls);
   if (!taskInput) {
     return { ok: false, status: 'unsupported_target', source, results: [], error: `${source}_target_not_supported_by_pilot` };
   }
