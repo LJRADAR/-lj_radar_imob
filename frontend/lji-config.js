@@ -126,6 +126,29 @@ window.LJI_IS_MOBILE_DEVICE = LJI_IS_MOBILE_DEVICE;
   }
 })();
 
+// Bootstrap tardio e determinístico. É carregado depois que app-auth.js teve chance
+// de montar/reconstruir o overlay, eliminando o retorno do login legado no Cloudflare.
+(function loadApprovedLayoutBootstrap(){
+  let loaded = false;
+  const load = () => {
+    if (loaded || document.querySelector('script[data-lji-approved-bootstrap-v26]')) return;
+    loaded = true;
+    const s = document.createElement('script');
+    s.src = 'approved-layout-bootstrap-v26.js?v=20260909-2';
+    s.async = false;
+    s.dataset.ljiApprovedBootstrapV26 = '1';
+    s.onerror = () => {
+      loaded = false;
+      console.error('LJ Radar: approved-layout-bootstrap-v26.js não carregou.');
+    };
+    (document.head || document.documentElement).appendChild(s);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load, {once:true});
+  else setTimeout(load, 0);
+  window.addEventListener('load', load, {once:true});
+  setTimeout(load, 1200);
+})();
+
 // Camadas pequenas e isoladas carregadas depois que app-core.js/app-backend.js
 // já definiram as funções. Evita reescrever o arquivo principal e reduz regressão.
 window.addEventListener('load', () => {
