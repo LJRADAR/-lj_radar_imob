@@ -50,6 +50,7 @@ async function runAdapter(source, request, config) {
       timeoutMs: config.requestTimeoutMs,
       timeoutSecs: config.apifyTimeoutSecs,
       maxChargeUsd: config.apifyMaxChargeUsd,
+      facebookGroupUrls: config.apifyFacebookGroupUrls,
     });
   }
   return { ok: false, status: 'unsupported', source, results: [], error: 'source_not_supported' };
