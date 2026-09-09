@@ -3,6 +3,11 @@ const clamp = (value, fallback, min, max) => {
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
 };
 
+const csv = (value) => String(value || '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
+
 export const config = {
   port: Number(process.env.PORT || 10000),
   authVerifierUrl: String(process.env.LJI_SOURCE_ROUTER_AUTH_URL || '').trim(),
@@ -15,6 +20,7 @@ export const config = {
     telegram: String(process.env.APIFY_TASK_TELEGRAM || '').trim(),
     quinto: String(process.env.APIFY_TASK_QUINTO || '').trim(),
   },
+  apifyFacebookGroupUrls: csv(process.env.APIFY_FACEBOOK_GROUP_URLS),
   apifyOlxTasks: {
     'São Caetano do Sul': String(process.env.APIFY_TASK_OLX_SCS || '').trim(),
     'Santo André': String(process.env.APIFY_TASK_OLX_SA || '').trim(),
