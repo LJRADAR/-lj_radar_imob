@@ -1,8 +1,43 @@
-/* LJ Radar Imob — Login polish v23 · 08/09/2026
-   Ajustes aprovados: logo oficial em destaque, 3 oportunidades com imagens reais,
-   composição fiel ao mockup aprovado e hover futurista com som via JS. */
+/* LJ Radar Imob — Login polish v23 · 09/09/2026
+   Ajustes aprovados: logo oficial em destaque, oportunidades visuais,
+   composição fiel ao mockup e garantia explícita de interação do formulário. */
 
 @media (min-width:901px){
+  .auth-overlay.lji-login-v23,
+  .auth-overlay.lji-login-v23 .lji-login-shell,
+  .auth-overlay.lji-login-v23 .lji-login-left,
+  .auth-overlay.lji-login-v23 .lji-login-left-inner,
+  .auth-overlay.lji-login-v23 .auth-card{
+    pointer-events:auto!important;
+  }
+  .auth-overlay.lji-login-v23 .auth-card{
+    position:relative!important;
+    z-index:50!important;
+  }
+  .auth-overlay.lji-login-v23 .auth-field,
+  .auth-overlay.lji-login-v23 .password-input-wrap,
+  .auth-overlay.lji-login-v23 .auth-field input,
+  .auth-overlay.lji-login-v23 #ljiAuthLogin,
+  .auth-overlay.lji-login-v23 #ljiForgotPassword,
+  .auth-overlay.lji-login-v23 .lji-login-controls,
+  .auth-overlay.lji-login-v23 .lji-request-access,
+  .auth-overlay.lji-login-v23 .lji-login-support{
+    pointer-events:auto!important;
+    position:relative;
+    z-index:55;
+  }
+  .auth-overlay.lji-login-v23 .auth-field input{
+    user-select:text!important;
+    -webkit-user-select:text!important;
+    cursor:text!important;
+  }
+  .lji-login-left::after,
+  .lji-login-edge-copy,
+  .lji-login-brand,
+  .lji-login-footer{
+    pointer-events:none!important;
+  }
+
   .lji-login-lang span{cursor:default;user-select:none;}
 
   .lji-login-brand{margin-bottom:6px!important;}
