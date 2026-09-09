@@ -1,7 +1,7 @@
 'use strict';
 
 /* LJ Radar Imob — Login polish v23
-   Ajusta somente apresentação e interação da tela de login desktop. */
+   Ajusta apresentação e interação da tela de login desktop sem observador recursivo. */
 (function(){
   let audioCtx = null;
   let lastPingAt = 0;
@@ -101,16 +101,12 @@
       input.style.cursor = 'text';
       clearInputBlocker(input);
     });
-    if(login.dataset.ljiForceEnabled !== '1'){
-      login.dataset.ljiForceEnabled = '1';
-      if(login.textContent.trim() === 'Entrar') login.disabled = false;
-    }
+    if(login.textContent.trim() === 'Entrar') login.disabled = false;
 
     if(overlay.dataset.ljiInteractionBridge !== '1'){
       overlay.dataset.ljiInteractionBridge = '1';
       overlay.addEventListener('pointerdown', function(e){
-        const controls = [email,pass];
-        for(const input of controls){
+        for(const input of [email,pass]){
           const r = input.getBoundingClientRect();
           if(pointInside(r,e.clientX,e.clientY) && e.target !== input){
             e.preventDefault();
@@ -143,11 +139,11 @@
     if(lang){
       const spans = lang.querySelectorAll('span');
       if(spans[0]){
-        spans[0].textContent = 'Brasil';
+        if(spans[0].textContent !== 'Brasil') spans[0].textContent = 'Brasil';
         spans[0].title = 'Mercado atual: Brasil';
       }
       if(spans[1]){
-        spans[1].textContent = 'PT-BR';
+        if(spans[1].textContent !== 'PT-BR') spans[1].textContent = 'PT-BR';
         spans[1].title = 'Idioma atual: Português (Brasil)';
       }
     }
@@ -208,7 +204,5 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', polish, {once:true});
   else polish();
   window.addEventListener('load', polish, {once:true});
-  [50,180,500,1200].forEach(ms=>setTimeout(polish,ms));
-  const observer = new MutationObserver(polish);
-  observer.observe(document.documentElement,{childList:true,subtree:true});
+  [80,250,700,1500].forEach(ms=>setTimeout(polish,ms));
 })();
