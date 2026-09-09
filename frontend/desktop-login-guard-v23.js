@@ -1,10 +1,39 @@
 'use strict';
 
 /* LJ Radar Imob — Desktop login late-mount guard
-   Corrige corrida entre app-auth.js e desktop-layout-v23.js: se o overlay de
-   autenticação surgir ou for reconstruído depois do carregamento inicial,
-   reaplica a composição desktop aprovada sem alterar autenticação ou regras. */
+   Corrige corrida entre app-auth.js e desktop-layout-v23.js e aplica o
+   background oficial aprovado do login em desktop e mobile. */
 (function(){
+  // Background oficial do login: Rio/Corcovado + prédios, sem a ponte antiga.
+  // Fica centralizado como camada visual e mantém os overlays azul/branco já existentes.
+  if(!document.querySelector('style[data-lji-login-bg-v26]')){
+    const style = document.createElement('style');
+    style.dataset.ljiLoginBgV26 = '1';
+    style.textContent = `
+      .lji-login-hero{
+        background-image:
+          linear-gradient(90deg,rgba(250,253,255,.94) 0%,rgba(234,243,253,.57) 36%,rgba(28,74,136,.22) 100%),
+          linear-gradient(180deg,rgba(238,246,255,.11),rgba(8,39,91,.20)),
+          url('https://images.unsplash.com/photo-1608378963517-1c47051c7415?auto=format&fit=crop&w=2400&q=85') !important;
+        background-position:center center!important;
+        background-size:cover!important;
+        background-repeat:no-repeat!important;
+      }
+      @media (max-width:900px){
+        .lji-m-login-hero{
+          background-image:
+            linear-gradient(180deg,rgba(223,238,255,.10) 0%,rgba(13,47,101,.32) 100%),
+            linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,.03)),
+            url('https://images.unsplash.com/photo-1608378963517-1c47051c7415?auto=format&fit=crop&w=1600&q=85') !important;
+          background-position:center 42%!important;
+          background-size:cover!important;
+          background-repeat:no-repeat!important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   if(window.LJI_IS_MOBILE_DEVICE) return;
 
   let loading = false;
