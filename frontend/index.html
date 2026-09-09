@@ -10,37 +10,135 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
+  const BUILD='28.0.0';
+  const BUST='20260909-4';
+  const logo='./lj-logo-compact.png?v='+BUILD;
+
+  function trueMobile(){
+    const ua=navigator.userAgent||'';
+    return !!(navigator.userAgentData&&navigator.userAgentData.mobile) ||
+      /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(ua) ||
+      (/Macintosh/i.test(ua) && navigator.maxTouchPoints>1);
+  }
+
+  function prepareCard(doc,card,mobile){
+    const oldBrand=card.querySelector('.auth-brand'); if(oldBrand) oldBrand.hidden=true;
+    const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
+
+    const forgot=card.querySelector('#ljiForgotPassword');
+    if(forgot && !card.querySelector('.lji-login-controls,.lji-m-login-controls')){
+      const controls=doc.createElement('div');
+      controls.className=mobile?'lji-m-login-controls':'lji-login-controls';
+      controls.innerHTML=mobile
+        ? '<label><input id="ljiMobileRemember" type="checkbox" checked><span></span><b>Lembrar acesso</b></label>'
+        : '<label class="lji-remember"><input id="ljiRememberAccess" type="checkbox" checked><span></span><b>Lembrar acesso</b></label>';
+      forgot.parentNode.insertBefore(controls,forgot);
+      controls.appendChild(forgot);
+    }
+
+    const login=card.querySelector('#ljiAuthLogin');
+    if(login && !card.querySelector('.lji-login-divider,.lji-m-divider')){
+      const divider=doc.createElement('div');
+      divider.className=mobile?'lji-m-divider':'lji-login-divider';
+      divider.innerHTML=mobile?'<i></i><b>ou</b><i></i>':'<span></span><b>ou</b><span></span>';
+      login.insertAdjacentElement('afterend',divider);
+      const req=doc.createElement('button');
+      req.type='button';
+      req.className=mobile?'lji-m-request':'lji-request-access';
+      req.innerHTML=mobile?'<span>♙</span> Solicitar acesso':'Solicitar acesso';
+      req.setAttribute('data-lji-request-access','1');
+      divider.insertAdjacentElement('afterend',req);
+    }
+  }
+
+  function buildApprovedAuth(doc,mobile){
+    const overlay=doc.querySelector('#ljiAuthOverlay');
+    const card=overlay&&overlay.querySelector('.auth-card');
+    if(!overlay||!card) throw new Error('auth_overlay_missing');
+    prepareCard(doc,card,mobile);
+
+    if(mobile){
+      overlay.className='auth-overlay lji-mobile-login-v25';
+      overlay.dataset.mobileV25='1';
+      overlay.dataset.approvedStatic='v28-mobile';
+      if(!card.querySelector('.lji-m-brand')){
+        const brand=doc.createElement('div');
+        brand.className='lji-m-brand';
+        brand.innerHTML='<img src="'+logo+'" alt="LJ Radar Imob"><p>Inteligência imobiliária para captação e oportunidades.</p>';
+        card.prepend(brand);
+      }
+      const shell=doc.createElement('div'); shell.className='lji-m-login-shell';
+      const hero=doc.createElement('section'); hero.className='lji-m-login-hero';
+      hero.innerHTML='<div class="lji-m-login-locale"><b>Brasil</b><i></i><b>PT-BR</b></div><div class="lji-m-login-copy"><small>ANÁLISE · DADOS · OPERAÇÃO</small><h1>O mercado imobiliário com <strong>mais inteligência.</strong></h1><p>ENCONTRE IMÓVEIS · IDENTIFIQUE OPORTUNIDADES · ANTECIPE MOVIMENTOS.</p></div><div class="lji-m-radar"><i></i><i></i><i></i><b></b></div>';
+      const wrap=doc.createElement('section'); wrap.className='lji-m-login-cardwrap';
+      const support=doc.createElement('button'); support.type='button'; support.className='lji-m-support'; support.textContent='◉  Falar com suporte'; support.setAttribute('data-lji-support','1');
+      wrap.append(card,support); shell.append(hero,wrap); overlay.replaceChildren(shell);
+    }else{
+      doc.documentElement.classList.add('lji-desktop-v23');
+      doc.body.classList.add('lji-layout-v23');
+      overlay.className='auth-overlay lji-login-v23';
+      overlay.dataset.v23Ready='1';
+      overlay.dataset.approvedStatic='v28-desktop';
+      const shell=doc.createElement('div'); shell.className='lji-login-shell';
+      const left=doc.createElement('section'); left.className='lji-login-left';
+      left.innerHTML='<div class="lji-login-edge-copy"><i></i><span>MAIS MERCADO</span><span>MAIS OPORTUNIDADES</span><span>MAIS RESULTADOS</span></div><div class="lji-login-left-inner"><div class="lji-login-brand" aria-label="LJ Radar Imob"><img class="lji-login-logo" src="'+logo+'" alt="LJ Radar Imob"><p>Inteligência imobiliária para captação e oportunidades.</p></div></div><div class="lji-login-footer">LJ Radar Imob &nbsp; © 2026</div>';
+      left.querySelector('.lji-login-left-inner').appendChild(card);
+      const support=doc.createElement('button'); support.type='button'; support.className='lji-login-support'; support.textContent='◉  Falar com suporte'; support.setAttribute('data-lji-support','1'); left.querySelector('.lji-login-left-inner').appendChild(support);
+
+      const hero=doc.createElement('section'); hero.className='lji-login-hero';
+      hero.innerHTML='<div class="lji-login-lang"><span>Brasil</span><i></i><span>PT-BR</span></div><div class="lji-login-hero-copy"><small>ANÁLISE &nbsp; · &nbsp; DADOS &nbsp; · &nbsp; OPERAÇÃO</small><h2>O mercado<br>imobiliário com<br><strong>mais inteligência.</strong></h2><em></em><p>ENCONTRE IMÓVEIS.<br>IDENTIFIQUE OPORTUNIDADES.<br>ANTECIPE MOVIMENTOS.</p></div><div class="lji-login-hero-radar" role="img" aria-label="Radar LJ"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="beam"></span><b></b></div><div class="lji-login-float lji-float-a"><strong>Apartamento</strong><span>Oportunidade detectada</span></div><div class="lji-login-float lji-float-b"><strong>Casa</strong><span>Alto potencial</span></div><div class="lji-login-float lji-float-c"><strong>Terreno</strong><span>Novo sinal no mercado</span></div><blockquote>“Dados transformam<br>o mercado em oportunidades.”</blockquote><div class="lji-login-bottom-words">DADOS <b>·</b> PESSOAS <b>·</b> OPORTUNIDADES <b>·</b> RESULTADOS</div>';
+      overlay.replaceChildren(shell); shell.append(left,hero);
+    }
+  }
+
+  function appendCss(doc,href,media){
+    const link=doc.createElement('link'); link.rel='stylesheet'; link.href=href; if(media) link.media=media; doc.head.appendChild(link);
+  }
+  function appendScript(doc,src){ const s=doc.createElement('script'); s.src=src; doc.body.appendChild(s); }
+
   try{
-    const response = await fetch('./app-shell-v22.50.4.html?boot=20260909-3', {cache:'no-store'});
+    const response=await fetch('./app-shell-v22.50.4.html?boot='+BUST,{cache:'no-store'});
     if(!response.ok) throw new Error('shell_http_'+response.status);
-    let html = await response.text();
+    let html=await response.text();
+    html=html.replaceAll('?v=22.50.4','?v='+BUILD);
+    html=html.replace('v22.50.4 · Filtros de Qualidade','v'+BUILD+' · Desktop + Mobile');
+    html=html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v'+BUILD+' · © 2026');
+    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · static approved auth · 09/09/2026 -->');
 
-    html = html.replaceAll('?v=22.50.4','?v=27.0.0');
-    html = html.replace('v22.50.4 · Filtros de Qualidade','v27.0.0 · Desktop + Mobile');
-    html = html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v27.0.0 · © 2026');
-    html = html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v27.0.0 · direct auth layout · 09/09/2026 -->');
+    const doc=new DOMParser().parseFromString(html,'text/html');
 
-    const approvedHead = `
-<link rel="stylesheet" href="./desktop-layout-v23.css?v=20260909-3" data-lji-cf-desktop>
-<link rel="stylesheet" href="./desktop-layout-v23-hotfix.css?v=20260909-3" data-lji-cf-desktop-hotfix>
-<link rel="stylesheet" href="./desktop-login-polish-v23.css?v=20260909-3" data-lji-cf-login-polish>
-<link rel="stylesheet" href="./dashboard-v24.css?v=20260909-3" data-lji-cf-dashboard>
-<link rel="stylesheet" href="./mobile-v25.css?v=20260909-3" media="(max-width: 900px)" data-lji-cf-mobile>`;
-    html = html.replace('</head>', approvedHead + '\n</head>');
+    // Remove qualquer tentativa antiga de reconstruir o login. A autenticação continua em app-auth.js.
+    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js'];
+    doc.querySelectorAll('script[src]').forEach(s=>{ if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n))) s.remove(); });
+    doc.querySelectorAll('link[href]').forEach(l=>{ const h=l.getAttribute('href'); if(/desktop-layout-v23|desktop-login-polish-v23|dashboard-v24|mobile-v25/.test(h)) l.remove(); });
 
-    // O layout de autenticação é aplicado diretamente sobre o overlay real já
-    // criado pelo shell. Não depende mais da corrida entre app-auth e layouts auxiliares.
-    const approvedTail = `
-<script src="./auth-layout-direct-v27.js?v=20260909-3" data-lji-auth-direct-v27><\/script>
-<script src="./desktop-login-polish-v23.js?v=20260909-3" data-lji-cf-polish><\/script>`;
-    html = html.replace('</body>', approvedTail + '\n</body>');
+    appendCss(doc,'./desktop-layout-v23.css?v='+BUILD);
+    appendCss(doc,'./desktop-layout-v23-hotfix.css?v='+BUILD);
+    appendCss(doc,'./desktop-login-polish-v23.css?v='+BUILD);
+    appendCss(doc,'./dashboard-v24.css?v='+BUILD);
+    appendCss(doc,'./mobile-v25.css?v='+BUILD,'(max-width: 900px)');
 
-    document.open();
-    document.write(html);
-    document.close();
+    const bg=doc.createElement('style');
+    bg.textContent='.lji-login-hero{background-image:linear-gradient(90deg,rgba(250,253,255,.94) 0%,rgba(234,243,253,.57) 36%,rgba(28,74,136,.22) 100%),linear-gradient(180deg,rgba(238,246,255,.11),rgba(8,39,91,.20)),url(https://images.unsplash.com/photo-1608378963517-1c47051c7415?auto=format&fit=crop&w=2400&q=85)!important;background-position:center!important;background-size:cover!important}.lji-m-login-hero{background-image:linear-gradient(180deg,rgba(223,238,255,.10),rgba(13,47,101,.32)),url(https://images.unsplash.com/photo-1608378963517-1c47051c7415?auto=format&fit=crop&w=1600&q=85)!important;background-position:center 42%!important;background-size:cover!important}';
+    doc.head.appendChild(bg);
+
+    buildApprovedAuth(doc,trueMobile());
+
+    // Scripts de layout entram só para o dashboard/app pós-login. O login já nasce pronto acima.
+    appendScript(doc,'./desktop-layout-v23.js?v='+BUILD);
+    appendScript(doc,'./dashboard-v24.js?v='+BUILD);
+    appendScript(doc,'./mobile-v25.js?v='+BUILD);
+    appendScript(doc,'./desktop-login-polish-v23.js?v='+BUILD);
+
+    const behavior=doc.createElement('script');
+    behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';info.classList.add('lji-auth-info-visible');}if(e.target.closest('[data-lji-support]')&&info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block';info.classList.add('lji-auth-info-visible');}});";
+    doc.body.appendChild(behavior);
+
+    const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
+    document.open(); document.write(out); document.close();
   }catch(error){
-    console.error('LJ Radar boot failed', error);
-    document.body.innerHTML = '<div class="lji-boot">Não foi possível carregar o LJ Radar. Atualize a página.</div>';
+    console.error('LJ Radar boot failed',error);
+    document.body.innerHTML='<div class="lji-boot">Não foi possível carregar o LJ Radar. Atualize a página.</div>';
   }
 })();
 </script>
