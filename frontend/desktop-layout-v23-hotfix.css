@@ -115,3 +115,28 @@
     min-height:40px!important;
   }
 }
+
+/* 09/09/2026 — fundo premium imobiliário aprovado.
+   Substitui o enquadramento com Cristo Redentor por skyline residencial costeiro,
+   mantendo o fade luxuoso até o branco no lado do formulário. */
+html body .auth-overlay.lji-login-v23 .lji-login-hero{
+  background-image:
+    linear-gradient(90deg,#fff 0%,rgba(255,255,255,.97) 12%,rgba(255,255,255,.85) 28%,rgba(255,255,255,.58) 45%,rgba(255,255,255,.29) 61%,rgba(255,255,255,.11) 78%,rgba(255,255,255,.03) 100%),
+    linear-gradient(180deg,rgba(238,247,255,.05) 0%,rgba(14,54,108,.16) 100%),
+    url('https://images.unsplash.com/photo-1762100491825-93b645a125e0?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=2600')!important;
+  background-position:center 46%!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+}
+
+@media (max-width:900px){
+  html body .auth-overlay.lji-mobile-login-v25 .lji-m-login-hero{
+    background-image:
+      linear-gradient(90deg,rgba(255,255,255,.46) 0%,rgba(255,255,255,.23) 42%,rgba(255,255,255,.06) 100%),
+      linear-gradient(180deg,rgba(235,245,255,.06) 0%,rgba(12,47,100,.20) 72%,rgba(255,255,255,.16) 100%),
+      url('https://images.unsplash.com/photo-1762100491825-93b645a125e0?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1600')!important;
+    background-position:center 48%!important;
+    background-size:cover!important;
+    background-repeat:no-repeat!important;
+  }
+}
