@@ -84,6 +84,14 @@ window.LJI_IS_MOBILE_DEVICE = LJI_IS_MOBILE_DEVICE;
     ui.onerror = () => console.error('LJ Radar: desktop-layout-v23.js não carregou.');
     document.head.appendChild(ui);
   }
+  if (!document.querySelector('script[data-lji-desktop-login-guard-v23]')) {
+    const loginGuard = document.createElement('script');
+    loginGuard.src = 'desktop-login-guard-v23.js?v=20260908-1';
+    loginGuard.async = false;
+    loginGuard.dataset.ljiDesktopLoginGuardV23 = '1';
+    loginGuard.onerror = () => console.error('LJ Radar: desktop-login-guard-v23.js não carregou.');
+    document.head.appendChild(loginGuard);
+  }
   if (!document.querySelector('script[data-lji-desktop-logo-v23]')) {
     const logo = document.createElement('script');
     logo.src = 'desktop-logo-v23.js?v=20260908-2';
