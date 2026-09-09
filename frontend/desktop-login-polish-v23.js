@@ -1,7 +1,7 @@
 'use strict';
 
 /* LJ Radar Imob — Login polish v23
-   Ajusta somente apresentação da tela de login desktop. */
+   Ajusta somente apresentação e interação da tela de login desktop. */
 (function(){
   let audioCtx = null;
   let lastPingAt = 0;
@@ -54,6 +54,89 @@
   function unlockAudio(){ getAudioCtx(); }
   document.addEventListener('pointerdown', unlockAudio, {once:true, passive:true});
   document.addEventListener('keydown', unlockAudio, {once:true});
+
+  function pointInside(rect,x,y){
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  function clearInputBlocker(input){
+    if(!input || typeof document.elementFromPoint !== 'function') return;
+    const rect = input.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    for(let i=0;i<5;i++){
+      const top = document.elementFromPoint(x,y);
+      if(!top || top === input || input.contains(top)) return;
+      if(top.contains(input)) return;
+      const overlay = document.querySelector('#ljiAuthOverlay');
+      if(!overlay || !overlay.contains(top)) return;
+      if(top.matches('input,button,a,label,.auth-field,.password-input-wrap,.auth-card,.lji-login-left-inner,.lji-login-left,.lji-login-shell')) return;
+      top.style.pointerEvents = 'none';
+      top.dataset.ljiPointerBlockerDisabled = '1';
+    }
+  }
+
+  function ensureLoginInteractive(){
+    const overlay = document.querySelector('#ljiAuthOverlay');
+    if(!overlay || overlay.classList.contains('hidden')) return;
+    const card = overlay.querySelector('.auth-card');
+    const email = overlay.querySelector('#ljiAuthEmail');
+    const pass = overlay.querySelector('#ljiAuthPassword');
+    const login = overlay.querySelector('#ljiAuthLogin');
+    const forgot = overlay.querySelector('#ljiForgotPassword');
+    if(!card || !email || !pass || !login) return;
+
+    [overlay, card, email, pass, login, forgot].filter(Boolean).forEach(el=>{
+      el.removeAttribute('inert');
+      el.style.pointerEvents = 'auto';
+    });
+    [email,pass].forEach(input=>{
+      input.disabled = false;
+      input.readOnly = false;
+      input.removeAttribute('aria-disabled');
+      input.removeAttribute('tabindex');
+      input.style.userSelect = 'text';
+      input.style.webkitUserSelect = 'text';
+      input.style.cursor = 'text';
+      clearInputBlocker(input);
+    });
+    if(login.dataset.ljiForceEnabled !== '1'){
+      login.dataset.ljiForceEnabled = '1';
+      if(login.textContent.trim() === 'Entrar') login.disabled = false;
+    }
+
+    if(overlay.dataset.ljiInteractionBridge !== '1'){
+      overlay.dataset.ljiInteractionBridge = '1';
+      overlay.addEventListener('pointerdown', function(e){
+        const controls = [email,pass];
+        for(const input of controls){
+          const r = input.getBoundingClientRect();
+          if(pointInside(r,e.clientX,e.clientY) && e.target !== input){
+            e.preventDefault();
+            e.stopPropagation();
+            input.focus({preventScroll:true});
+            return;
+          }
+        }
+        const rLogin = login.getBoundingClientRect();
+        if(pointInside(rLogin,e.clientX,e.clientY) && e.target !== login){
+          e.preventDefault();
+          e.stopPropagation();
+          login.click();
+          return;
+        }
+        if(forgot){
+          const rForgot = forgot.getBoundingClientRect();
+          if(pointInside(rForgot,e.clientX,e.clientY) && e.target !== forgot){
+            e.preventDefault();
+            e.stopPropagation();
+            forgot.click();
+          }
+        }
+      }, true);
+    }
+  }
 
   function polish(){
     const lang = document.querySelector('.lji-login-lang');
@@ -118,11 +201,14 @@
       radar.dataset.polishSoundBound = '1';
       radar.addEventListener('pointerenter', futuristicMetalPing);
     }
+
+    ensureLoginInteractive();
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', polish, {once:true});
   else polish();
   window.addEventListener('load', polish, {once:true});
+  [50,180,500,1200].forEach(ms=>setTimeout(polish,ms));
   const observer = new MutationObserver(polish);
   observer.observe(document.documentElement,{childList:true,subtree:true});
 })();
