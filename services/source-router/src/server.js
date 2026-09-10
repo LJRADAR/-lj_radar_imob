@@ -2,6 +2,7 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
+import { collectApifyTask } from './adapters/apify.js';
 import { verifyQuinto } from './adapters/quinto.js';
 
 const VERSION = '1.6.2';
@@ -142,6 +143,95 @@ function healthPayload() {
   };
 }
 
+function pilotSignals(rows) {
+  const signals = {
+    owner_language: 0,
+    direct_contact: 0,
+    realtor_language: 0,
+    sale_language: 0,
+    rent_language: 0,
+    permuta_language: 0,
+    property_language: 0,
+  };
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const haystack = `${row?.title || ''} ${row?.description || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (/\b(proprietari[oa]|direto com o dono|direto proprietari|sou o dono|meu apartamento|minha casa)\b/.test(haystack)) signals.owner_language += 1;
+    if (/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}|whats(?:app|zap)|wpp/.test(haystack)) signals.direct_contact += 1;
+    if (/\b(creci|corretor|corretora|imobiliaria|consultor imobiliario)\b/.test(haystack)) signals.realtor_language += 1;
+    if (/\b(vendo|vende|venda|a venda)\b/.test(haystack)) signals.sale_language += 1;
+    if (/\b(alugo|aluga|aluguel|locacao|locar)\b/.test(haystack)) signals.rent_language += 1;
+    if (/\b(permuta|troca por imovel|aceita troca)\b/.test(haystack)) signals.permuta_language += 1;
+    if (/\b(apartamento|apto|casa|sobrado|terreno|cobertura|studio|kitnet|imovel)\b/.test(haystack)) signals.property_language += 1;
+  }
+  return signals;
+}
+
+function pilotGroupKey(groupUrl) {
+  try {
+    const url = new URL(groupUrl);
+    return url.pathname.split('/').filter(Boolean).pop() || groupUrl;
+  } catch {
+    return groupUrl;
+  }
+}
+
+async function runFacebookPilotOnBoot() {
+  if (String(process.env.LJI_FACEBOOK_PILOT_ON_BOOT || '').trim() !== '1') return;
+  const groups = Array.isArray(config.apifyFacebookGroupUrls) ? config.apifyFacebookGroupUrls : [];
+  if (!config.apifyToken || !config.apifyTasks?.facebook || groups.length === 0) {
+    console.error('facebook pilot skipped', JSON.stringify({
+      has_token: Boolean(config.apifyToken),
+      has_task: Boolean(config.apifyTasks?.facebook),
+      group_count: groups.length,
+    }));
+    return;
+  }
+
+  const request = {
+    source: 'facebook',
+    state_code: 'SP',
+    city: 'São Paulo Centro Expandido',
+    transaction_type: 'sale',
+    property_type_code: null,
+    limit: 10,
+  };
+  const summaries = [];
+  console.log('facebook pilot start', JSON.stringify({ group_count: groups.length, posts_per_group: 10 }));
+
+  for (const groupUrl of groups) {
+    const result = await collectApifyTask(request, {
+      token: config.apifyToken,
+      taskId: config.apifyTasks.facebook,
+      source: 'facebook',
+      timeoutMs: config.requestTimeoutMs,
+      timeoutSecs: config.apifyTimeoutSecs,
+      maxChargeUsd: config.apifyMaxChargeUsd,
+      facebookGroupUrls: [groupUrl],
+    });
+    const summary = {
+      group: pilotGroupKey(groupUrl),
+      ok: result?.ok === true,
+      status: result?.status || null,
+      error: result?.error || null,
+      raw_count: Number(result?.raw_count || 0),
+      normalized_count: Array.isArray(result?.results) ? result.results.length : 0,
+      signals: pilotSignals(result?.results),
+    };
+    summaries.push(summary);
+    console.log('facebook pilot group', JSON.stringify(summary));
+  }
+
+  const totals = summaries.reduce((acc, item) => {
+    acc.groups_ok += item.ok ? 1 : 0;
+    acc.raw_count += item.raw_count;
+    acc.normalized_count += item.normalized_count;
+    for (const [key, value] of Object.entries(item.signals || {})) acc.signals[key] = (acc.signals[key] || 0) + Number(value || 0);
+    return acc;
+  }, { groups_ok: 0, raw_count: 0, normalized_count: 0, signals: {} });
+
+  console.log('facebook pilot complete', JSON.stringify({ group_count: groups.length, ...totals }));
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
@@ -214,4 +304,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`lji-source-router ${VERSION} listening on 0.0.0.0:${config.port}`);
+  void runFacebookPilotOnBoot();
 });
