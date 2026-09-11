@@ -1,19 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const VERSION = "6.4.0";
+const VERSION = "6.5.0";
 const FUNCTION_NAME = "coletor-lj-v2";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const URL = String(Deno.env.get("SUPABASE_URL") ?? "").trim().replace(/\/+$/, "");
 const SERVICE = String(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
 const ANON = String(Deno.env.get("SUPABASE_ANON_KEY") ?? "").trim();
 const SUPPORTED_SOURCES = ["all", "threads", "olx", "instagram", "facebook", "telegram"];
-const SOURCE_FALLBACK: Record<string, string> = {
-  threads: "Threads público",
-  olx: "OLX Imóveis",
-  instagram: "Instagram público",
-  facebook: "Facebook público",
-  telegram: "Telegram público",
-};
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -21,19 +14,19 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function json(payload: unknown, status = 200) {
+function json(payload, status = 200) {
   return new Response(JSON.stringify(payload, null, 2), {
     status,
     headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
 
-function text(value: unknown): string | null {
+function text(value) {
   const v = String(value ?? "").trim();
   return v || null;
 }
 
-function namedSecrets(): Record<string, unknown> {
+function namedSecrets() {
   try {
     return JSON.parse(String(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"));
   } catch {
@@ -41,17 +34,17 @@ function namedSecrets(): Record<string, unknown> {
   }
 }
 
-function signingSecret(): string {
+function signingSecret() {
   const value = namedSecrets()[NAMED_SECRET_KEY];
   return typeof value === "string" ? value.trim() : "";
 }
 
-function bearer(req: Request) {
+function bearer(req) {
   const auth = String(req.headers.get("authorization") ?? "").trim();
   return auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
 }
 
-function adminHeaders(extra: Record<string, string> = {}) {
+function adminHeaders(extra = {}) {
   return {
     apikey: SERVICE,
     Authorization: `Bearer ${SERVICE}`,
@@ -60,14 +53,14 @@ function adminHeaders(extra: Record<string, string> = {}) {
   };
 }
 
-async function adminGet(path: string) {
+async function adminGet(path) {
   const r = await fetch(`${URL}/rest/v1/${path}`, { headers: adminHeaders() });
   const data = await r.json().catch(() => []);
   if (!r.ok) throw new Error(`admin_get_${r.status}:${JSON.stringify(data)}`);
   return data;
 }
 
-async function adminPost(path: string, body: unknown, extraHeaders: Record<string, string> = {}) {
+async function adminPost(path, body, extraHeaders = {}) {
   const r = await fetch(`${URL}/rest/v1/${path}`, {
     method: "POST",
     headers: adminHeaders(extraHeaders),
@@ -78,7 +71,7 @@ async function adminPost(path: string, body: unknown, extraHeaders: Record<strin
   return data;
 }
 
-async function adminPatch(path: string, body: unknown) {
+async function adminPatch(path, body) {
   const r = await fetch(`${URL}/rest/v1/${path}`, {
     method: "PATCH",
     headers: adminHeaders({ Prefer: "return=representation" }),
@@ -89,11 +82,11 @@ async function adminPatch(path: string, body: unknown) {
   return data;
 }
 
-async function rpc(name: string, body: Record<string, unknown> = {}) {
+async function rpc(name, body = {}) {
   return adminPost(`rpc/${name}`, body);
 }
 
-async function authorize(req: Request) {
+async function authorize(req) {
   const incomingApiKey = String(req.headers.get("apikey") ?? "").trim();
   const incomingBearer = bearer(req);
   const named = signingSecret();
@@ -103,6 +96,7 @@ async function authorize(req: Request) {
   }
 
   if (!ANON || !incomingBearer) return { ok: false, mode: "none", userId: null };
+
   const userResponse = await fetch(`${URL}/auth/v1/user`, {
     headers: { apikey: ANON, Authorization: `Bearer ${incomingBearer}` },
   });
@@ -132,7 +126,7 @@ async function internalConfig() {
   return { routerUrl };
 }
 
-async function resolveWorkspace(auth: { mode: string; userId: string | null }, body: Record<string, unknown>) {
+async function resolveWorkspace(auth, body) {
   const explicit = text(body?.workspace_id);
 
   if (auth.mode === "user" && auth.userId) {
@@ -157,34 +151,18 @@ async function resolveWorkspace(auth: { mode: string; userId: string | null }, b
   throw new Error("workspace_id_required");
 }
 
-function canonicalUrl(raw: unknown) {
-  try {
-    const u = new URL(String(raw));
-    if (!/^https?:$/.test(u.protocol)) return null;
-    u.hash = "";
-    for (const key of [...u.searchParams.keys()]) {
-      const k = key.toLowerCase();
-      if (k.startsWith("utm_") || ["fbclid", "gclid", "ref", "source"].includes(k)) u.searchParams.delete(key);
-    }
-    if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, "");
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
-
-async function sha256(value: string) {
+async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function base64(bytes: ArrayBuffer) {
+function base64(bytes) {
   let binary = "";
   for (const b of new Uint8Array(bytes)) binary += String.fromCharCode(b);
   return btoa(binary);
 }
 
-async function hmacSignature(secret: string, message: string) {
+async function hmacSignature(secret, message) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -196,146 +174,42 @@ async function hmacSignature(secret: string, message: string) {
   return base64(signature);
 }
 
-function isoOrNull(value: unknown) {
-  const raw = text(value);
-  if (!raw) return null;
-  const ms = Date.parse(raw);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
-}
-
-function resultSnippet(item: any) {
-  const description = text(item?.description);
-  if (description) return description;
-  const parts: string[] = [];
-  if (Number.isFinite(Number(item?.price))) parts.push(`R$ ${Number(item.price).toLocaleString("pt-BR")}`);
-  if (text(item?.neighborhood)) parts.push(text(item.neighborhood) as string);
-  return parts.join(" · ") || null;
-}
-
-async function sourceIdByName(name: string | null) {
-  if (!name) return null;
-  const rows = await adminGet(`lj_v2_sources?select=id&name=eq.${encodeURIComponent(name)}&is_active=eq.true&limit=1`);
-  return Array.isArray(rows) && rows[0]?.id ? rows[0].id : null;
-}
-
-async function createRun(args: {
-  workspaceId: string; auth: any; stateCode: string; city: string; transactionType: string; propertyType: string | null; source: string;
-}) {
+async function createRun({ workspaceId, auth, stateCode, city, transactionType, propertyType, source }) {
   const rows = await adminPost("lj_v2_collector_runs", [{
-    workspace_id: args.workspaceId,
-    run_mode: args.auth.mode === "user" ? "manual" : "scheduled",
+    workspace_id: workspaceId,
+    run_mode: auth.mode === "user" ? "manual" : "scheduled",
     status: "running",
-    requested_by: args.auth.userId,
-    state_code: args.stateCode,
-    city: args.city,
-    transaction_type: args.transactionType,
-    property_type_code: args.propertyType,
+    requested_by: auth.userId,
+    state_code: stateCode,
+    city,
+    transaction_type: transactionType,
+    property_type_code: propertyType,
     started_at: new Date().toISOString(),
     system_snapshot: {
       collector_version: VERSION,
-      strategy: "source_router_multi_provider",
-      source: args.source,
+      strategy: "source_router_multi_provider_db_ingest",
+      source,
       external_search_engine: false,
       providers: ["threads_api", "apify"],
       router_auth: "hmac-sha256-v1",
+      persistence: "lji_ingest_source_router_discovery",
     },
-    metadata: { source_router: true, requested_source: args.source },
+    metadata: { source_router: true, requested_source: source },
   }], { Prefer: "return=representation" });
+
   const run = Array.isArray(rows) ? rows[0] : null;
   if (!run?.id) throw new Error("collector_run_create_failed");
-  return run.id as string;
+  return run.id;
 }
 
-async function persistDiscovery(args: { item: any; runId: string; sourceId: string | null; request: any; position: number }) {
-  const originalUrl = text(args.item?.source_url);
-  const normalizedUrl = originalUrl ? canonicalUrl(originalUrl) : null;
-  if (!originalUrl || !normalizedUrl) return { saved: false, wasNew: false, reason: "invalid_url" };
-
-  const existingRows = await adminGet(
-    `lj_v2_raw_discoveries?select=id,occurrence_count,metadata,discovery_status&original_url=eq.${encodeURIComponent(originalUrl)}&limit=1`,
-  );
-  const existing = Array.isArray(existingRows) ? existingRows[0] : null;
-  const now = new Date().toISOString();
-  const publishedAt = isoOrNull(args.item?.published_at);
-  const provider = args.item?.raw_quality?.apify === true
-    ? "apify"
-    : args.item?.raw_quality?.official_api === true
-      ? "official_api"
-      : "source_router";
-  const metadata = {
-    ...(existing?.metadata && typeof existing.metadata === "object" ? existing.metadata : {}),
-    source_router: {
-      source_name: text(args.item?.source_name),
-      source_item_id: text(args.item?.source_item_id),
-      provider,
-      official_api: args.item?.raw_quality?.official_api === true,
-      apify: args.item?.raw_quality?.apify === true,
-      exact_city_or_zone: args.item?.raw_quality?.exact_city_or_zone === true,
-      owner_signal: args.item?.raw_quality?.owner_signal === true,
-      collected_at: now,
-      collector_version: VERSION,
-      router_auth: "hmac-sha256-v1",
-    },
-  };
-  const common = {
-    source_id: args.sourceId,
-    normalized_url: normalizedUrl,
-    url_hash: await sha256(normalizedUrl),
-    title: text(args.item?.title),
-    snippet: resultSnippet(args.item),
-    advertised_price: Number.isFinite(Number(args.item?.price)) ? Number(args.item.price) : null,
-    detected_state_code: text(args.item?.state_code) ?? args.request.state_code,
-    detected_city: text(args.item?.city) ?? args.request.city,
-    detected_neighborhood: text(args.item?.neighborhood),
-    detected_transaction: text(args.item?.transaction_type) ?? args.request.transaction_type,
-    detected_property_type: text(args.item?.property_type) ?? args.request.property_type_code,
-    advertiser_hint: text(args.item?.seller_nickname),
-    ...(publishedAt ? { published_at: publishedAt } : {}),
-    last_seen_at: now,
-    latest_run_id: args.runId,
-    raw_payload: args.item,
-    metadata,
-  };
-
-  let discoveryId: string | null = null;
-  let wasNew = false;
-  if (existing?.id) {
-    discoveryId = existing.id;
-    await adminPatch(`lj_v2_raw_discoveries?id=eq.${encodeURIComponent(discoveryId)}`, {
-      ...common,
-      occurrence_count: Math.max(1, Number(existing.occurrence_count || 1)) + 1,
-    });
-  } else {
-    const rows = await adminPost("lj_v2_raw_discoveries", [{
-      original_url: originalUrl,
-      ...common,
-      discovery_status: "raw",
-    }], { Prefer: "return=representation" });
-    discoveryId = Array.isArray(rows) ? rows[0]?.id ?? null : null;
-    wasNew = Boolean(discoveryId);
-  }
-
-  if (!discoveryId) return { saved: false, wasNew: false, reason: "discovery_id_missing" };
-  await adminPost("lj_v2_collector_run_discoveries?on_conflict=run_id,discovery_id", [{
-    run_id: args.runId,
-    discovery_id: discoveryId,
-    query_text: `source_router:${text(args.item?.source_name) ?? "unknown"}`,
-    result_position: args.position,
-    relevance_score: null,
-    was_new: wasNew,
-  }], { Prefer: "resolution=merge-duplicates,return=minimal" });
-
-  return { saved: true, wasNew, discoveryId };
-}
-
-async function updateRun(runId: string, patch: Record<string, unknown>) {
+async function updateRun(runId, patch) {
   await adminPatch(`lj_v2_collector_runs?id=eq.${encodeURIComponent(runId)}`, {
     ...patch,
     updated_at: new Date().toISOString(),
   });
 }
 
-async function routerHealth(routerUrl: string | null) {
+async function routerHealth(routerUrl) {
   if (!routerUrl) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
@@ -350,7 +224,7 @@ async function routerHealth(routerUrl: string | null) {
   }
 }
 
-async function callRouter(routerUrl: string, secret: string, body: Record<string, unknown>) {
+async function callRouter(routerUrl, secret, body) {
   const rawBody = JSON.stringify(body);
   const bodySha256 = await sha256(rawBody);
   const timestamp = String(Date.now());
@@ -375,10 +249,7 @@ async function callRouter(routerUrl: string, secret: string, body: Record<string
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok !== true) {
-      const err = new Error(`source_router_${response.status}:${text(data?.error) ?? "collection_failed"}`) as Error & { status?: number; router?: any };
-      err.status = response.status;
-      err.router = data;
-      throw err;
+      throw new Error(`source_router_${response.status}:${text(data?.error) ?? "collection_failed"}`);
     }
     return data;
   } finally {
@@ -386,12 +257,25 @@ async function callRouter(routerUrl: string, secret: string, body: Record<string
   }
 }
 
-Deno.serve(async (req: Request) => {
+async function persistViaDb(runId, item, position) {
+  const result = await rpc("lji_ingest_source_router_discovery", {
+    p_run_id: runId,
+    p_item: item,
+    p_position: position,
+  });
+  if (!result || result.saved !== true || !result.discovery_id) {
+    throw new Error(`db_ingest_failed:${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
 
-  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const body = await req.json().catch(() => ({}));
   const action = body?.action === "collect" ? "collect" : "health";
+
   if (!URL || !SERVICE) return json({ ok: false, error: "supabase_runtime_missing" }, 500);
 
   const cfg = await internalConfig();
@@ -403,7 +287,8 @@ Deno.serve(async (req: Request) => {
       ok: true,
       function: FUNCTION_NAME,
       version: VERSION,
-      strategy: "source_router_multi_provider",
+      strategy: "source_router_multi_provider_db_ingest",
+      persistence: "lji_ingest_source_router_discovery",
       external_search_engine: false,
       auth_scheme: "hmac-sha256-v1",
       source_router_url_configured: Boolean(cfg.routerUrl),
@@ -421,6 +306,7 @@ Deno.serve(async (req: Request) => {
 
   const auth = await authorize(req);
   if (!auth.ok) return json({ ok: false, error: "collect_authentication_failed" }, 401);
+
   if (!cfg.routerUrl || !secret) {
     return json({
       ok: false,
@@ -434,24 +320,28 @@ Deno.serve(async (req: Request) => {
 
   const stateCode = String(body?.state_code ?? "").trim().toUpperCase();
   const city = text(body?.city);
-  const transactionType = body?.transaction_type === "sale" || body?.transaction_type === "rent" ? body.transaction_type : null;
+  const transactionType = body?.transaction_type === "sale" || body?.transaction_type === "rent"
+    ? body.transaction_type
+    : null;
   const propertyType = text(body?.property_type_code);
   const source = String(body?.source ?? "all").trim().toLowerCase();
 
   if (stateCode !== "SP" || !city || !transactionType) {
-    return json({ ok: false, error: "invalid_request", required: ["state_code=SP", "city", "transaction_type"] }, 400);
-  }
-  if (!SUPPORTED_SOURCES.includes(source)) {
     return json({
       ok: false,
-      error: source === "mercadolivre" ? "source_temporarily_disabled_pending_official_access" : "source_not_supported",
+      error: "invalid_request",
+      required: ["state_code=SP", "city", "transaction_type"],
     }, 400);
+  }
+
+  if (!SUPPORTED_SOURCES.includes(source)) {
+    return json({ ok: false, error: "source_not_supported" }, 400);
   }
 
   const canRun = await rpc("lj_v2_collector_can_run", {});
   if (canRun !== true) return json({ ok: false, error: "collector_disabled_by_master_control" }, 423);
 
-  let workspaceId: string;
+  let workspaceId;
   try {
     workspaceId = String(await resolveWorkspace(auth, body));
   } catch (error) {
@@ -459,69 +349,74 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, error: message }, message === "workspace_forbidden" ? 403 : 400);
   }
 
-  let runId: string | null = null;
+  let runId = null;
   try {
+    const limit = Math.max(
+      10,
+      Math.min(80, Number(body?.results_per_query || 10) * Math.max(1, Number(body?.query_limit || 4))),
+    );
+
     const routerResult = await callRouter(cfg.routerUrl, secret, {
       source,
       state_code: stateCode,
       city,
       transaction_type: transactionType,
       property_type_code: propertyType,
-      limit: Math.max(10, Math.min(80, Number(body?.results_per_query || 10) * Math.max(1, Number(body?.query_limit || 4)))),
+      limit,
     });
 
-    runId = await createRun({ workspaceId, auth, stateCode, city, transactionType, propertyType, source });
+    runId = await createRun({
+      workspaceId,
+      auth,
+      stateCode,
+      city,
+      transactionType,
+      propertyType,
+      source,
+    });
+
     const results = Array.isArray(routerResult?.results) ? routerResult.results : [];
-    const sourceIdCache = new Map<string, string | null>();
     let newResults = 0;
     let existingResults = 0;
     let persistErrors = 0;
-    let skippedResults = 0;
-    const samples: Array<Record<string, unknown>> = [];
-    let position = 0;
+    const persistenceErrorSamples = [];
+    const samples = [];
 
+    let position = 0;
     for (const item of results) {
       position += 1;
       try {
-        const itemSourceName = text(item?.source_name) ?? SOURCE_FALLBACK[source] ?? "Web aberta com contato";
-        let sourceId = sourceIdCache.get(itemSourceName);
-        if (sourceId === undefined) {
-          sourceId = await sourceIdByName(itemSourceName);
-          if (!sourceId) sourceId = await sourceIdByName("Web aberta com contato");
-          sourceIdCache.set(itemSourceName, sourceId ?? null);
-        }
-
-        const persisted = await persistDiscovery({
-          item,
-          runId,
-          sourceId: sourceId ?? null,
-          request: { state_code: stateCode, city, transaction_type: transactionType, property_type_code: propertyType },
-          position,
-        });
-        if (!persisted.saved) {
-          skippedResults += 1;
-          continue;
-        }
-        if (persisted.wasNew) newResults += 1;
+        const persisted = await persistViaDb(runId, item, position);
+        if (persisted.was_new === true) newResults += 1;
         else existingResults += 1;
+
         if (samples.length < 5) {
-          samples.push({ source: itemSourceName, title: text(item?.title), url: text(item?.source_url), property_type: text(item?.property_type) });
+          samples.push({
+            source: text(item?.source_name),
+            title: text(item?.title),
+            url: text(item?.source_url),
+            property_type: text(item?.property_type),
+            transaction_type: text(item?.transaction_type),
+            price: Number.isFinite(Number(item?.price)) ? Number(item.price) : null,
+            city: text(item?.city),
+          });
         }
       } catch (error) {
         persistErrors += 1;
-        console.error(`[${FUNCTION_NAME}] persist error`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        if (persistenceErrorSamples.length < 3) persistenceErrorSamples.push(message.slice(0, 400));
+        console.error(`[${FUNCTION_NAME}] persist error`, message);
       }
     }
 
     const routerStatus = text(routerResult?.status) ?? "completed";
-    const finalStatus = persistErrors > 0 || routerStatus === "partial" ? "partial" : "completed";
     const sourceReport = Array.isArray(routerResult?.source_report) ? routerResult.source_report : [];
-    const queriesRun = sourceReport.length > 0 ? sourceReport.length : 1;
+    const finalStatus = persistErrors > 0 || routerStatus === "partial" ? "partial" : "completed";
 
     await updateRun(runId, {
       status: finalStatus,
       finished_at: new Date().toISOString(),
-      total_queries: queriesRun,
+      total_queries: sourceReport.length > 0 ? sourceReport.length : 1,
       total_raw_results: Number(routerResult?.raw_count ?? results.length),
       total_unique_results: newResults + existingResults,
       total_new_results: newResults,
@@ -536,14 +431,15 @@ Deno.serve(async (req: Request) => {
         persisted_results: newResults + existingResults,
         new_results: newResults,
         existing_results: existingResults,
-        skipped_results: skippedResults,
+        skipped_results: 0,
         persistence_errors: persistErrors,
+        persistence_error_samples: persistenceErrorSamples,
       },
       error_message: persistErrors > 0 ? `${persistErrors} persistence errors` : null,
     });
 
     return json({
-      ok: true,
+      ok: persistErrors === 0,
       function: FUNCTION_NAME,
       version: VERSION,
       status: finalStatus,
@@ -552,17 +448,24 @@ Deno.serve(async (req: Request) => {
       source_report: sourceReport,
       external_search_engine: false,
       auth_scheme: "hmac-sha256-v1",
-      target: { state_code: stateCode, city, transaction_type: transactionType, property_type_code: propertyType },
+      persistence: "lji_ingest_source_router_discovery",
+      target: {
+        state_code: stateCode,
+        city,
+        transaction_type: transactionType,
+        property_type_code: propertyType,
+      },
       counters: {
         raw_results: Number(routerResult?.raw_count ?? results.length),
         qualified_results: Number(routerResult?.qualified_count ?? results.length),
         new_results: newResults,
         existing_results: existingResults,
-        skipped_results: skippedResults,
+        skipped_results: 0,
         errors: persistErrors,
       },
+      persistence_error_samples: persistenceErrorSamples,
       samples,
-    });
+    }, persistErrors === 0 ? 200 : 207);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (runId) {
@@ -573,6 +476,7 @@ Deno.serve(async (req: Request) => {
         error_message: message.slice(0, 1000),
       }).catch(() => {});
     }
+
     const status = /source_router_503:/.test(message) ? 503 : 502;
     return json({
       ok: false,
