@@ -9,6 +9,13 @@ on:
       - 'supabase/**'
       - 'render.yaml'
       - '.github/workflows/package-current-version.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'services/**'
+      - 'supabase/**'
+      - 'render.yaml'
+      - '.github/workflows/package-current-version.yml'
 
 jobs:
   package:
