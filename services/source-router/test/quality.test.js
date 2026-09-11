@@ -34,6 +34,7 @@ test('professional advertiser diagnostics identify the first decisive signal', (
   assert.equal(professionalAdvertiserReason({ seller_type: 'business', seller_nickname: 'Maria' }), 'seller_type');
   assert.equal(professionalAdvertiserReason({ seller_nickname: 'ABC Imóveis' }), 'seller_name');
   assert.equal(professionalAdvertiserReason({ seller_nickname: 'João', description: 'CRECI 12345-F' }), 'description');
+  assert.equal(professionalAdvertiserReason({ seller_nickname: 'Leonardo', description: 'WRA Business & Real Estate' }), 'description');
   assert.equal(professionalAdvertiserReason({ seller_nickname: 'Maria', description: 'Vendo meu apartamento direto.' }), null);
 });
 
@@ -128,4 +129,35 @@ test('facebook quality helper diagnostics classify pilot examples', () => {
   assert.equal(isCoreOperationalLocation({ city: 'Osasco' }), false);
   assert.equal(isDemandOnlyPost({ title: 'Procuro casa para comprar em Santo André' }), true);
   assert.equal(isDemandOnlyPost({ title: 'Vendo minha casa em Santo André' }), false);
+});
+
+test('facebook posts with no structured city are rejected when text explicitly points outside the core operation', () => {
+  assert.equal(isCoreOperationalLocation({
+    city: null,
+    title: 'FLÓRIDA | CASA À VENDA EM APOPKA — $499,990',
+    description: 'Perto de Orlando, WRA Business & Real Estate',
+  }), false);
+  assert.equal(isCoreOperationalLocation({
+    city: null,
+    title: 'Casa à venda',
+    description: 'Imóvel em Curitiba PR',
+  }), false);
+  assert.equal(isCoreOperationalLocation({
+    city: null,
+    title: 'Apartamento à venda',
+    description: 'Direto com proprietário; bairro a confirmar',
+  }), true);
+});
+
+test('foreign professional real-estate post is removed before persistence', () => {
+  const result = filterQualifiedRows([{
+    source_url: 'https://www.facebook.com/groups/1405730683009091/permalink/4421601938088602/',
+    title: 'FLÓRIDA | CASA À VENDA EM APOPKA — $499,990',
+    description: '4 quartos, 3 banheiros. WRA Business & Real Estate',
+    property_type: 'Casa',
+    city: null,
+    seller_nickname: 'Leonardo Santos',
+  }], 'facebook');
+  assert.equal(result.accepted.length, 0);
+  assert.equal(result.rejection_reasons.outside_core_area, 1);
 });
