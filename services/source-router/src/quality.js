@@ -40,6 +40,12 @@ const DEMAND_LANGUAGE = /\b(procuro|busco|quero comprar|quero alugar|preciso de|
 const SUPPLY_LANGUAGE = /\b(vendo|vende|venda|alugo|aluga|alugue|aluguel|locacao|locar|permuta|troco)\b/;
 const CORE_FACEBOOK_CITIES = new Set(['santo andre','sao bernardo do campo','sao caetano do sul','diadema','sao paulo']);
 
+// Used only when the platform did not provide a structured city. It prevents a
+// post from inheriting the requested run target merely because it was published
+// inside a São Paulo group. Keep this list to explicit, high-confidence signals.
+const OUTSIDE_CORE_TEXT = /\b(apopka|orlando|miami|fort lauderdale|tampa|florida|united states|estados unidos|eua|rio de janeiro|niteroi|curitiba|porto alegre|pelotas|belo horizonte|salvador|recife|fortaleza|brasilia|goiania|balneario camboriu|sao carlos|campinas|sorocaba|ribeirao preto|santos)\b/;
+const OUTSIDE_STATE_TOKEN = /\b(rj|mg|pr|sc|rs|ba|pe|ce|go|df)\b/;
+
 export function isUnavailableContent(row) {
   return UNAVAILABLE_CONTENT.test(norm(`${row?.title || ''} ${row?.description || ''}`));
 }
@@ -60,14 +66,19 @@ export function isDemandOnlyPost(row) {
 
 export function isCoreOperationalLocation(row) {
   const city = norm(row?.city);
-  if (!city) return true;
-  if (city.startsWith('sao paulo')) return true;
-  return CORE_FACEBOOK_CITIES.has(city);
+  if (city) {
+    if (city.startsWith('sao paulo')) return true;
+    return CORE_FACEBOOK_CITIES.has(city);
+  }
+
+  const haystack = norm(`${row?.title || ''} ${row?.description || ''} ${row?.attributes?.raw_location || ''}`);
+  if (OUTSIDE_CORE_TEXT.test(haystack) || OUTSIDE_STATE_TOKEN.test(haystack)) return false;
+  return true;
 }
 
-const PROFESSIONAL_TYPE = /\b(business|professional|dealer|agency|company|store|loja|empresa|imobiliaria|corretor|corretora|construtora|incorporadora|real estate)\b/;
-const PROFESSIONAL_NAME = /\b(imobiliaria|imoveis|creci|corretor|corretora|empreendimentos|incorporadora|construtora|real estate|properties)\b/;
-const PROFESSIONAL_EVIDENCE = /\b(creci|corretor|corretora|imobiliaria|construtora|incorporadora|consultor imobiliario|consultoria imobiliaria|assessoria imobiliaria)\b/;
+const PROFESSIONAL_TYPE = /\b(business|professional|dealer|agency|company|store|loja|empresa|imobiliaria|corretor|corretora|construtora|incorporadora|real estate|realtor|broker)\b/;
+const PROFESSIONAL_NAME = /\b(imobiliaria|imoveis|creci|corretor|corretora|empreendimentos|incorporadora|construtora|real estate|properties|realtor|broker)\b/;
+const PROFESSIONAL_EVIDENCE = /\b(creci|corretor|corretora|imobiliaria|construtora|incorporadora|consultor imobiliario|consultoria imobiliaria|assessoria imobiliaria|real estate|realtor|broker|corretagem)\b/;
 
 export function professionalAdvertiserReason(row) {
   const type = norm(row?.seller_type ?? row?.attributes?.seller_type);
