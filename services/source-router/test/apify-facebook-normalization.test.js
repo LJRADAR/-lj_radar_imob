@@ -58,3 +58,26 @@ test('facebook actor item normalizes rent, price, city, property metrics and dir
   assert.match(row.attributes.phone, /93914-1991/);
   assert.equal(row.attributes.transaction_inferred, true);
 });
+
+test('facebook OCR from image can correct transaction and recover contact hints', () => {
+  const row = normalizeApifyItem({
+    url: 'https://www.facebook.com/groups/x/permalink/2/',
+    time: '2026-09-11T18:58:49.000Z',
+    title: '1 bed · 1 bath · House',
+    text: '1 quarto 1 banheiro – Casa\nRua Aldebarã, Inamar, Diadema - SP',
+    price: 'R$680',
+    location: 'Diadema, SP',
+    user: { id: 'u2', name: 'Rodrigo' },
+    attachments: [{ ocrText: 'ALUGO 2 CÔMODOS Jd.Inamar Diadema Valor R$680,00 Informações WhatsApp 99858-80-98' }],
+  }, {
+    city: 'Santo André',
+    transaction_type: 'sale',
+    property_type_code: null,
+  }, 'facebook');
+
+  assert.equal(row.transaction_type, 'rent');
+  assert.equal(row.price, 680);
+  assert.equal(row.city, 'Diadema');
+  assert.match(row.attributes.attachment_ocr_text, /ALUGO/);
+  assert.ok(row.attributes.phone);
+});
