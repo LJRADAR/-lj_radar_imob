@@ -1,0 +1,61 @@
+/* LJ Radar Imob — Desktop × Mobile consistency v29.6 */
+:root{--lji-action-bg:var(--card,#fff);--lji-action-fg:var(--text,#1f2937);--lji-action-line:var(--line,#dfe5ee);--lji-action-soft:var(--soft,#f6f8fb)}
+[data-theme="dark"]{--lji-action-bg:#151b24;--lji-action-fg:#eef3f8;--lji-action-line:#334155;--lji-action-soft:#202938}
+[data-theme="graphite"]{--lji-action-bg:#f7f9fb;--lji-action-fg:#1f2937;--lji-action-line:#cfd6df;--lji-action-soft:#e9eef4}
+[data-theme="emerald"]{--lji-action-bg:#fff;--lji-action-fg:#17362c;--lji-action-line:#cfe2d9;--lji-action-soft:#eef7f3}
+
+.lji-gmail-toolbar,.lji-gmail-toolbar-v295{background:var(--lji-action-bg)!important;color:var(--lji-action-fg)!important;border-color:var(--lji-action-line)!important}
+.lji-gmail-toolbar button,.lji-gmail-toolbar-v295 button,.lji-gmail-toolbar-v295 select{background:var(--lji-action-bg)!important;color:var(--lji-action-fg)!important;border-color:var(--lji-action-line)!important}
+.lji-gmail-toolbar button:hover,.lji-gmail-toolbar-v295 button:hover,.lji-gmail-toolbar-v295 select:hover{background:var(--lji-action-soft)!important}
+.lji-gmail-toolbar button:disabled,.lji-gmail-toolbar-v295 button:disabled{opacity:.48!important;color:color-mix(in srgb,var(--lji-action-fg) 55%,transparent)!important}
+.lji-gmail-toolbar .lji-gmail-danger,.lji-gmail-toolbar-v295 .danger{color:#b42318!important}
+[data-theme="dark"] .lji-gmail-toolbar .lji-gmail-danger,[data-theme="dark"] .lji-gmail-toolbar-v295 .danger{color:#ff8f84!important;border-color:#6b3c3a!important}
+
+.page.lji-gmail-page .card,.page.lji-gmail-page table,.page.lji-gmail-page .intent-compact-list,.page.lji-gmail-page .match-groups,.page.lji-gmail-page .pipeline-column-body{background:var(--lji-action-bg)!important;color:var(--lji-action-fg)!important;border-color:var(--lji-action-line)!important}
+.page.lji-gmail-page table thead th{background:var(--lji-action-soft)!important;color:color-mix(in srgb,var(--lji-action-fg) 72%,transparent)!important;border-color:var(--lji-action-line)!important}
+.page.lji-gmail-page table tbody tr:nth-child(even),.page.lji-gmail-page table tbody tr:nth-child(odd){background:transparent}
+.page.lji-gmail-page table tbody tr:hover,.page.lji-gmail-page .m-card:hover{background:color-mix(in srgb,var(--accent,#1a73e8) 7%,var(--lji-action-bg))!important}
+.page.lji-gmail-page .lji-row-selected{background:color-mix(in srgb,var(--accent,#1a73e8) 14%,var(--lji-action-bg))!important}
+
+.lji-mobile-gmail-card{position:relative!important;padding-left:46px!important}
+.lji-mobile-gmail-check{position:absolute;left:13px;top:14px;z-index:4;width:24px;height:24px;display:grid;place-items:center;cursor:pointer}
+.lji-mobile-gmail-check input{position:absolute;opacity:0;pointer-events:none}
+.lji-mobile-gmail-check span{width:18px;height:18px;border:1.5px solid var(--lji-action-line);border-radius:4px;background:var(--lji-action-bg);display:block;position:relative}
+.lji-mobile-gmail-check input:checked+span{background:var(--accent,#1a73e8);border-color:var(--accent,#1a73e8)}
+.lji-mobile-gmail-check input:checked+span::after{content:"";position:absolute;left:5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+
+@media(max-width:900px){
+  body.lji-mobile-v25 main{overflow:visible!important}
+  .page.lji-gmail-page{overflow:visible!important;max-width:100%!important}
+  .lji-gmail-toolbar,.lji-gmail-toolbar-v295{position:sticky;top:60px;z-index:25;display:flex!important;align-items:center!important;overflow-x:auto!important;overflow-y:hidden!important;gap:6px!important;min-height:48px!important;padding:7px 8px!important;margin:7px 0!important;border-radius:11px!important;box-shadow:0 4px 16px rgba(25,58,111,.06)!important;scrollbar-width:none}
+  .lji-gmail-toolbar::-webkit-scrollbar,.lji-gmail-toolbar-v295::-webkit-scrollbar{display:none}
+  .lji-gmail-toolbar button,.lji-gmail-toolbar-v295 button,.lji-gmail-toolbar-v295 select{min-height:36px!important;height:36px!important;flex:0 0 auto!important;font-size:11px!important;padding:0 10px!important;white-space:nowrap!important}
+  .lji-gmail-toolbar .lji-gmail-count,.lji-gmail-toolbar-v295 .count{font-size:10.5px!important;flex:0 0 auto!important;margin-left:4px!important}
+  .lji-gmail-toolbar input[type=checkbox],.lji-gmail-toolbar-v295 input[type=checkbox]{width:18px!important;height:18px!important;flex:0 0 18px!important}
+
+  .page.lji-gmail-page .mobile-card-list{display:grid!important;gap:8px!important}
+  .page.lji-gmail-page .mobile-card-list .m-card,.lji-gmail-selectable-card,.sales-inbox-thread{background:var(--lji-action-bg)!important;color:var(--lji-action-fg)!important;border:1px solid var(--lji-action-line)!important;border-radius:12px!important;box-shadow:none!important;margin:0!important}
+  .page.lji-gmail-page .m-card-top,.page.lji-gmail-page .m-card-actions{gap:8px!important;flex-wrap:wrap!important}
+  .page.lji-gmail-page .m-card-actions a,.page.lji-gmail-page .m-card-actions button{min-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;white-space:normal!important;text-align:center!important}
+  .page.lji-gmail-page .source-action,.page.lji-gmail-page .contact-btn,.page.lji-gmail-page .wa-ready{max-width:100%!important;overflow-wrap:anywhere!important}
+
+  .lji-mobile-scroll-safe{max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+  .lji-mobile-scroll-safe table{min-width:720px!important}
+  #tradeIntentsTable>table,#tradeMatchesTable>table{display:block!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+  #tradeIntentsTable>table tbody,#tradeIntentsTable>table thead,#tradeMatchesTable>table tbody,#tradeMatchesTable>table thead{width:max-content;min-width:760px}
+
+  .pipeline-board{max-width:100%!important;overflow-x:auto!important;scroll-snap-type:x proximity}
+  .pipeline-column{min-width:min(86vw,330px)!important;scroll-snap-align:start}
+  .match-group-head{grid-template-columns:1fr!important;gap:10px!important}
+  .match-property-row{grid-template-columns:auto 1fr!important;gap:8px!important}
+  .match-property-row .match-price,.match-property-row .match-source-actions{grid-column:2!important}
+  .intent-compact-card{grid-template-columns:1fr!important;gap:8px!important}
+  .sales-inbox-thread{width:100%!important;text-align:left!important}
+}
+
+@media(max-width:430px){
+  .lji-gmail-toolbar,.lji-gmail-toolbar-v295{top:58px!important}
+  .lji-gmail-toolbar button,.lji-gmail-toolbar-v295 button,.lji-gmail-toolbar-v295 select{font-size:10.5px!important;padding:0 9px!important}
+  .lji-mobile-gmail-card{padding-left:42px!important}
+  .lji-mobile-gmail-check{left:10px!important;top:12px!important}
+}
