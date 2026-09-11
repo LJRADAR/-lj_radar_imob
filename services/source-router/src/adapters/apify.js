@@ -39,19 +39,143 @@ function normalizeText(value) {
     .trim();
 }
 
-function numberOrNull(value) {
+export function parseMoney(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  const raw = String(value).trim().replace(/[^0-9,.-]/g, '');
+  let raw = String(value).trim().replace(/[^0-9,.-]/g, '');
   if (!raw) return null;
+
+  const negative = raw.startsWith('-');
+  raw = raw.replace(/-/g, '');
+  const commaCount = (raw.match(/,/g) || []).length;
+  const dotCount = (raw.match(/\./g) || []).length;
+  const comma = raw.lastIndexOf(',');
+  const dot = raw.lastIndexOf('.');
   let normalized = raw;
-  const comma = normalized.lastIndexOf(',');
-  const dot = normalized.lastIndexOf('.');
-  if (comma > dot) normalized = normalized.replace(/\./g, '').replace(',', '.');
-  else if (dot > comma) normalized = normalized.replace(/,/g, '');
-  else normalized = normalized.replace(/,/g, '.');
-  const n = Number(normalized);
+
+  if (commaCount && dotCount) {
+    const decimalIndex = Math.max(comma, dot);
+    const decimalDigits = raw.length - decimalIndex - 1;
+    if (decimalDigits === 1 || decimalDigits === 2) {
+      const integerPart = raw.slice(0, decimalIndex).replace(/[.,]/g, '');
+      const decimalPart = raw.slice(decimalIndex + 1).replace(/[.,]/g, '');
+      normalized = `${integerPart}.${decimalPart}`;
+    } else {
+      normalized = raw.replace(/[.,]/g, '');
+    }
+  } else if (commaCount || dotCount) {
+    const sep = commaCount ? ',' : '.';
+    const parts = raw.split(sep);
+    const tail = parts.at(-1) || '';
+    if (parts.length > 2) {
+      if (tail.length === 1 || tail.length === 2) {
+        normalized = `${parts.slice(0, -1).join('')}.${tail}`;
+      } else {
+        normalized = parts.join('');
+      }
+    } else if (tail.length === 3) {
+      normalized = parts.join('');
+    } else if (tail.length === 1 || tail.length === 2) {
+      normalized = `${parts[0]}.${tail}`;
+    } else {
+      normalized = parts.join('');
+    }
+  }
+
+  const n = Number(`${negative ? '-' : ''}${normalized}`);
   return Number.isFinite(n) ? n : null;
+}
+
+function textBlob(title, description) {
+  return normalizeText(`${title || ''} ${description || ''}`);
+}
+
+export function inferTransactionType(title, description, fallback = null) {
+  const n = textBlob(title, description);
+  const rent = /\b(alugo|aluga|alugue|aluguel|alugar|locacao|locar|arrendo|arrendamento|for rent)\b/.test(n);
+  const sale = /\b(vendo|vende|venda|a venda|para venda|for sale)\b/.test(n);
+  if (rent && !sale) return 'rent';
+  if (sale && !rent) return 'sale';
+  if (/\b(permuta|permutar|troco|troca por imovel|aceita troca)\b/.test(n) && !rent) return 'sale';
+  return fallback === 'rent' || fallback === 'sale' ? fallback : null;
+}
+
+export function parseFacebookLocation(value) {
+  const raw = text(value);
+  if (!raw) return { city: null, state_code: null };
+  const parts = raw.split(',').map((part) => part.trim()).filter(Boolean);
+  let state = null;
+  if (parts.length > 1) {
+    const candidate = parts.at(-1).replace(/[^A-Za-z]/g, '').toUpperCase();
+    if (/^[A-Z]{2}$/.test(candidate)) state = candidate;
+  }
+  return { city: parts[0] || null, state_code: state };
+}
+
+function inferCoreCityFromText(title, description) {
+  const n = textBlob(title, description);
+  const cities = [
+    ['São Caetano do Sul', /\bsao caetano(?: do sul)?\b/],
+    ['São Bernardo do Campo', /\bsao bernardo(?: do campo)?\b/],
+    ['Santo André', /\bsanto andre\b/],
+    ['Diadema', /\bdiadema\b/],
+    ['São Paulo', /\bsao paulo\b/],
+  ];
+  for (const [city, pattern] of cities) if (pattern.test(n)) return city;
+  return null;
+}
+
+function inferPropertyTypeFromText(title, description) {
+  const n = textBlob(title, description);
+  if (/\b(apartamento|apartamentos|apto|aptos|apartment|apartments)\b/.test(n)) return 'Apartamento';
+  if (/\b(casa|casas|sobrado|sobrados|house|houses|home|homes)\b/.test(n)) return 'Casa';
+  if (/\b(cobertura|coberturas|penthouse)\b/.test(n)) return 'Cobertura';
+  if (/\b(studio|studios|kitnet|kitnets|flat|flats)\b/.test(n)) return 'Studio';
+  if (/\b(terreno|terrenos|lote|lotes)\b/.test(n)) return 'Terreno';
+  return null;
+}
+
+function metricFromText(title, description, patterns) {
+  const n = `${title || ''} ${description || ''}`;
+  for (const pattern of patterns) {
+    const match = n.match(pattern);
+    if (match?.[1]) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+  return null;
+}
+
+function scaledPrice(value, scale) {
+  const base = parseMoney(value);
+  if (base === null) return null;
+  const n = normalizeText(scale);
+  if (n.startsWith('milhao') || n.startsWith('milhoes')) return base * 1000000;
+  if (n === 'mil') return base * 1000;
+  return base;
+}
+
+function priceFromText(title, description, transactionType) {
+  const raw = `${title || ''} ${description || ''}`;
+  const specific = transactionType === 'rent'
+    ? raw.match(/(?:aluguel|loca(?:c|ç)[aã]o|alugo|aluga[- ]?se)\s*(?:de|por|:|-)?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i)
+    : raw.match(/(?:pre[cç]o|valor|vendo|venda)\s*(?:de|por|:|-)?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i);
+  if (specific?.[1]) return scaledPrice(specific[1], specific[2]);
+  const currency = raw.match(/R\$\s*([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i);
+  return currency?.[1] ? scaledPrice(currency[1], currency[2]) : null;
+}
+
+function contactPhoneFromText(title, description) {
+  const raw = `${title || ''} ${description || ''}`;
+  const match = raw.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/);
+  return match ? match[0].trim() : null;
+}
+
+function whatsappFromText(title, description) {
+  const raw = `${title || ''} ${description || ''}`;
+  const match = raw.match(/https?:\/\/(?:wa\.me|api\.whatsapp\.com)\/[^\s]+/i);
+  return match ? match[0] : null;
 }
 
 function first(item, keys) {
@@ -98,7 +222,7 @@ function propertyMetric(properties, labels) {
   for (const entry of properties) {
     const name = normalizeText(entry?.name ?? entry?.label ?? entry?.key);
     if (!name || !wanted.some((label) => name === label || name.includes(label))) continue;
-    const value = numberOrNull(entry?.value ?? entry?.values?.[0]);
+    const value = parseMoney(entry?.value ?? entry?.values?.[0]);
     if (value !== null) return value;
   }
   return null;
@@ -149,13 +273,16 @@ export function buildTaskInput(request, source, maxItems, facebookGroupUrls = FA
   };
 }
 
-function normalizeItem(item, request, source) {
+export function normalizeApifyItem(item, request, source) {
   const url = text(first(item, ['source_url', 'url', 'link', 'permalink', 'postUrl', 'listingUrl']));
   if (!url || !/^https?:\/\//i.test(url)) return null;
 
   const title = text(first(item, ['title', 'name', 'caption', 'text', 'description']));
   const description = text(first(item, ['description', 'text', 'caption', 'content']));
-  const actualCity = text(first(item, ['city', 'locationCity', 'municipality']));
+  const rawLocation = text(first(item, ['location', 'locationName', 'placeName']));
+  const facebookLocation = source === 'facebook' ? parseFacebookLocation(rawLocation) : { city: null, state_code: null };
+  const directCity = text(first(item, ['city', 'locationCity', 'municipality']));
+  const actualCity = directCity || facebookLocation.city || (source === 'facebook' ? inferCoreCityFromText(title, description) : null);
   const neighborhood = text(first(item, ['neighborhood', 'neighbourhood', 'bairro', 'district']));
   if (source === 'olx' && (!actualCity || !locationMatchesTarget(request.city, actualCity, neighborhood || ''))) return null;
   const city = actualCity || (source === 'olx' ? request.city : null);
@@ -166,16 +293,33 @@ function normalizeItem(item, request, source) {
   const sourceItemId = text(first(item, ['source_item_id', 'id', 'postId', 'listingId', 'shortcode', 'shortCode'])) || url;
   const properties = Array.isArray(item?.properties) ? item.properties : [];
   const images = Array.isArray(item?.photos) ? item.photos : Array.isArray(item?.images) ? item.images : [];
+  const attachments = Array.isArray(item?.attachments) ? item.attachments : [];
   const category = text(first(item, ['property_type', 'propertyType', 'type', 'categoryName', 'category']));
+  const transactionType = source === 'facebook'
+    ? inferTransactionType(title, description, request.transaction_type)
+    : request.transaction_type;
+  const propertyType = source === 'facebook'
+    ? normalizePropertyType(category) || inferPropertyTypeFromText(title, description) || normalizePropertyType(request.property_type_code)
+    : normalizePropertyType(request.property_type_code) || normalizePropertyType(category) || inferPropertyTypeFromText(title, description);
 
-  const areaM2 = numberOrNull(first(item, ['area_m2', 'areaM2', 'area', 'floorSize']))
+  const areaM2 = parseMoney(first(item, ['area_m2', 'areaM2', 'area', 'floorSize']))
     ?? propertyMetric(properties, ['Área útil', 'Area util', 'Área', 'Area', 'Metragem']);
-  const bedrooms = numberOrNull(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
-    ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios']);
-  const bathrooms = numberOrNull(first(item, ['bathrooms', 'bathroomCount']))
-    ?? propertyMetric(properties, ['Banheiros', 'Banheiro']);
-  const parkingSpaces = numberOrNull(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
-    ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem']);
+  const bedrooms = parseMoney(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
+    ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios'])
+    ?? metricFromText(title, description, [/(\d+)\s*(?:dorm(?:it[oó]rios?)?|quartos?|beds?)\b/i]);
+  const bathrooms = parseMoney(first(item, ['bathrooms', 'bathroomCount']))
+    ?? propertyMetric(properties, ['Banheiros', 'Banheiro'])
+    ?? metricFromText(title, description, [/(\d+)\s*(?:banheiros?|baths?)\b/i]);
+  const parkingSpaces = parseMoney(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
+    ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem'])
+    ?? metricFromText(title, description, [/(\d+)\s*(?:vagas?|garagens?)\b/i]);
+  const price = parseMoney(first(item, ['price', 'amount', 'value'])) ?? priceFromText(title, description, transactionType);
+  const phone = text(first(item, ['phone', 'telephone', 'contactPhone'])) || contactPhoneFromText(title, description);
+  const whatsapp = text(first(item, ['whatsapp', 'whatsappUrl'])) || whatsappFromText(title, description);
+  const attachmentImage = attachments
+    .map((entry) => text(entry?.thumbnail) || text(entry?.photo_image?.uri) || text(entry?.image?.uri))
+    .find(Boolean) || null;
+  const tradeSignal = /\b(permuta|permutar|troco|troca por imovel|aceita troca)\b/.test(textBlob(title, description));
 
   return {
     source_name: SOURCE_LABELS[source] || `Apify ${source}`,
@@ -183,13 +327,13 @@ function normalizeItem(item, request, source) {
     source_item_id: sourceItemId,
     title: title || description?.slice(0, 180) || null,
     description,
-    price: numberOrNull(first(item, ['price', 'amount', 'value'])),
+    price,
     currency: text(first(item, ['currency', 'currency_id'])) || 'BRL',
-    state_code: text(first(item, ['state', 'state_code', 'stateCode'])) || 'SP',
+    state_code: text(first(item, ['state', 'state_code', 'stateCode'])) || facebookLocation.state_code || 'SP',
     city,
     neighborhood,
-    transaction_type: request.transaction_type,
-    property_type: normalizePropertyType(request.property_type_code) || normalizePropertyType(category),
+    transaction_type: transactionType,
+    property_type: propertyType,
     published_at: publishedAt,
     seller_id: text(nested(item, ['seller.id', 'owner.id', 'user.id'])) || seller,
     seller_nickname: seller,
@@ -199,15 +343,19 @@ function normalizeItem(item, request, source) {
     bathrooms: bathrooms !== null ? Math.max(0, Math.trunc(bathrooms)) : null,
     parking_spaces: parkingSpaces !== null ? Math.max(0, Math.trunc(parkingSpaces)) : null,
     postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
-    main_image_url: text(first(item, ['thumbnailUrl', 'imageUrl', 'mainImageUrl'])) || text(images[0]),
+    main_image_url: text(first(item, ['thumbnailUrl', 'imageUrl', 'mainImageUrl'])) || text(images[0]) || attachmentImage,
     attributes: {
-      phone: text(first(item, ['phone', 'telephone', 'contactPhone'])),
-      whatsapp: text(first(item, ['whatsapp', 'whatsappUrl'])),
+      phone,
+      whatsapp,
       seller_type: sellerType,
-      phone_available: nested(item, ['seller.phoneAvailable']) ?? first(item, ['phoneAvailable', 'hasPhone']) ?? null,
+      phone_available: nested(item, ['seller.phoneAvailable']) ?? first(item, ['phoneAvailable', 'hasPhone']) ?? Boolean(phone),
       postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
       category_name: text(first(item, ['categoryName', 'category'])),
-      facebook_group_url: text(first(item, ['facebookUrl'])),
+      facebook_group_url: text(first(item, ['facebookUrl', 'inputUrl'])),
+      facebook_group_title: text(first(item, ['groupTitle'])),
+      raw_location: rawLocation,
+      transaction_inferred: transactionType !== request.transaction_type,
+      trade_signal: tradeSignal,
       properties,
       requested_target: request.city,
       requested_transaction_type: request.transaction_type,
@@ -294,7 +442,7 @@ export async function collectApifyTask(request, {
     const normalized = [];
     const seen = new Set();
     for (const item of rows) {
-      const row = normalizeItem(item, request, source);
+      const row = normalizeApifyItem(item, request, source);
       if (!row?.source_url || seen.has(row.source_url)) continue;
       seen.add(row.source_url);
       normalized.push(row);

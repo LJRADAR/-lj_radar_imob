@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import {
   canonicalSourceKey,
   filterQualifiedRows,
+  isCoreOperationalLocation,
+  isDemandOnlyPost,
   isObviousProfessionalAdvertiser,
+  isPropertyRelevant,
+  isUnavailableContent,
   professionalAdvertiserReason,
   sourceUrlAllowed,
 } from '../src/quality.js';
@@ -55,6 +59,10 @@ test('filterQualifiedRows rejects wrong domains and explains professional eviden
   assert.equal(result.rejected_count, 4);
   assert.deepEqual(result.rejection_reasons, {
     wrong_domain: 1,
+    unavailable_content: 0,
+    non_property: 0,
+    outside_core_area: 0,
+    demand_post: 0,
     professional_advertiser: 3,
     professional_seller_type: 1,
     professional_seller_name: 1,
@@ -67,4 +75,57 @@ test('canonicalSourceKey removes tracking noise but preserves identifying query 
     canonicalSourceKey('https://www.facebook.com/groups/1/posts/2/?utm_source=x&story_fbid=9#fragment'),
     'https://www.facebook.com/groups/1/posts/2?story_fbid=9',
   );
+});
+
+test('facebook quality rejects unavailable, non-property, outside-area and demand-only posts', () => {
+  const rows = [
+    {
+      source_url: 'https://www.facebook.com/groups/1/posts/1',
+      title: "This content isn't available right now",
+      city: 'Santo André',
+    },
+    {
+      source_url: 'https://www.facebook.com/groups/1/posts/2',
+      title: '2026 Volkswagen Polo',
+      description: 'carro completo, tabela FIPE',
+      city: 'Santo André',
+    },
+    {
+      source_url: 'https://www.facebook.com/groups/1/posts/3',
+      title: '3 beds · 2 bath · House',
+      description: 'Casa com piscina e garagem',
+      city: 'Itanhaém',
+    },
+    {
+      source_url: 'https://www.facebook.com/groups/1/posts/4',
+      title: 'Procuro apartamento',
+      description: 'Quero comprar apartamento em Diadema',
+      city: 'Diadema',
+    },
+    {
+      source_url: 'https://www.facebook.com/groups/1/posts/5',
+      title: 'Apartamento direto com proprietário',
+      description: 'Vendo apartamento 2 dormitórios em Santo André',
+      city: 'Santo André',
+      seller_nickname: 'Maria',
+    },
+  ];
+  const result = filterQualifiedRows(rows, 'facebook');
+  assert.equal(result.accepted.length, 1);
+  assert.equal(result.accepted[0].source_url.endsWith('/5'), true);
+  assert.equal(result.rejected_count, 4);
+  assert.equal(result.rejection_reasons.unavailable_content, 1);
+  assert.equal(result.rejection_reasons.non_property, 1);
+  assert.equal(result.rejection_reasons.outside_core_area, 1);
+  assert.equal(result.rejection_reasons.demand_post, 1);
+});
+
+test('facebook quality helper diagnostics classify pilot examples', () => {
+  assert.equal(isUnavailableContent({ title: "This content isn't available right now" }), true);
+  assert.equal(isPropertyRelevant({ title: 'Bebê Reborn Silicone', description: 'boneca realista' }), false);
+  assert.equal(isPropertyRelevant({ title: '3 beds · 2 bath · House' }), true);
+  assert.equal(isCoreOperationalLocation({ city: 'Diadema' }), true);
+  assert.equal(isCoreOperationalLocation({ city: 'Osasco' }), false);
+  assert.equal(isDemandOnlyPost({ title: 'Procuro casa para comprar em Santo André' }), true);
+  assert.equal(isDemandOnlyPost({ title: 'Vendo minha casa em Santo André' }), false);
 });
