@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const VERSION = "6.5.0";
+const VERSION = "6.6.0";
 const FUNCTION_NAME = "coletor-lj-v2";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const URL = String(Deno.env.get("SUPABASE_URL") ?? "").trim().replace(/\/+$/, "");
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
   try {
     const limit = Math.max(
       10,
-      Math.min(80, Number(body?.results_per_query || 10) * Math.max(1, Number(body?.query_limit || 4))),
+      Math.min(200, Number(body?.results_per_query || 10) * Math.max(1, Number(body?.query_limit || 4))),
     );
 
     const routerResult = await callRouter(cfg.routerUrl, secret, {
