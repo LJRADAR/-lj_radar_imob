@@ -1,0 +1,1 @@
+Regression case: Facebook sometimes returns `price: 0` even when the post text includes the real amount (for example, `valor 1200 reais`). The source router must treat non-positive Facebook price values as missing and recover the amount from text/OCR instead.

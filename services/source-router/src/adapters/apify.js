@@ -158,12 +158,15 @@ function scaledPrice(value, scale) {
 
 function priceFromText(title, description, transactionType) {
   const raw = `${title || ''} ${description || ''}`;
-  const specific = transactionType === 'rent'
-    ? raw.match(/(?:aluguel|loca(?:c|ç)[aã]o|alugo|aluga[- ]?se)\s*(?:de|por|:|-)?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i)
-    : raw.match(/(?:pre[cç]o|valor|vendo|venda)\s*(?:de|por|:|-)?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i);
+  const labels = transactionType === 'rent'
+    ? /(?:aluguel|loca(?:c|ç)[aã]o|alugo|aluga[- ]?se|pre[cç]o|valor)\s*(?:de|por)?\s*[:=,.-]?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i
+    : /(?:pre[cç]o|valor|vendo|venda)\s*(?:de|por)?\s*[:=,.-]?\s*(?:R\$\s*)?([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i;
+  const specific = raw.match(labels);
   if (specific?.[1]) return scaledPrice(specific[1], specific[2]);
   const currency = raw.match(/R\$\s*([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?/i);
-  return currency?.[1] ? scaledPrice(currency[1], currency[2]) : null;
+  if (currency?.[1]) return scaledPrice(currency[1], currency[2]);
+  const reais = raw.match(/([0-9][0-9.,]*)\s*(milh(?:a|ã)o(?:es)?|mil)?\s*(?:reais|real)\b/i);
+  return reais?.[1] ? scaledPrice(reais[1], reais[2]) : null;
 }
 
 function contactPhoneFromText(title, description) {
@@ -318,7 +321,10 @@ export function normalizeApifyItem(item, request, source) {
   const parkingSpaces = parseMoney(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
     ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem'])
     ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:vagas?|garagens?)\b/i]);
-  const price = parseMoney(first(item, ['price', 'amount', 'value'])) ?? priceFromText(title, inferenceDescription, transactionType);
+  const providerPrice = parseMoney(first(item, ['price', 'amount', 'value']));
+  const price = source === 'facebook' && (providerPrice === null || providerPrice <= 0)
+    ? priceFromText(title, inferenceDescription, transactionType)
+    : providerPrice ?? priceFromText(title, inferenceDescription, transactionType);
   const phone = text(first(item, ['phone', 'telephone', 'contactPhone'])) || contactPhoneFromText(title, inferenceDescription);
   const whatsapp = text(first(item, ['whatsapp', 'whatsappUrl'])) || whatsappFromText(title, inferenceDescription);
   const attachmentImage = attachments
