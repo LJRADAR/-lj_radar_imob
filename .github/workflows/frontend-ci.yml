@@ -29,6 +29,21 @@ jobs:
             echo "Checking $file"
             node --check "$file"
           done < <(find frontend -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
+      - name: Guard approved login hero and runtime wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'photo-1773643331825-52bdcd45edca' frontend/index.html; then
+            echo 'Unapproved login hero found in index.html'
+            exit 1
+          fi
+          grep -q 'photo-1762100491825-93b645a125e0' frontend/desktop-layout-v23-hotfix.css
+          if grep -q 'v29.5 extension loader' frontend/gmail-system-v29.js; then
+            echo 'Duplicate Gmail v29.5 loader detected'
+            exit 1
+          fi
+          test "$(grep -o "appendScript(doc,'./gmail-system-v29-5.js" frontend/index.html | wc -l)" -eq 1
+          test "$(grep -o "appendScript(doc,'./responsive-consistency-v29-6.js" frontend/index.html | wc -l)" -eq 1
       - name: Upload Cloudflare deploy package
         uses: actions/upload-artifact@v4
         with:
