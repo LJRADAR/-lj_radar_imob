@@ -17,10 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build ZIP
         run: |
-          zip -r LJ_Radar_Imob_v29.1_Central_Captacao.zip frontend services supabase render.yaml README.md -x '*.git*'
+          zip -r LJ_Radar_Imob_v30.0_Clean.zip frontend services supabase render.yaml README.md -x '*.git*'
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: LJ_Radar_Imob_v29.1_Central_Captacao
-          path: LJ_Radar_Imob_v29.1_Central_Captacao.zip
-          retention-days: 7
+          name: LJ_Radar_Imob_v30.0_Clean
+          path: LJ_Radar_Imob_v30.0_Clean.zip
+          retention-days: 30
