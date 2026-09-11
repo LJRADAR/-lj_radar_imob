@@ -10,8 +10,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='29.3.0';
-  const BUST='20260911-qualified-leads-1';
+  const BUILD='29.4.0';
+  const BUST='20260911-gmail-system-1';
   const logo='./lj-logo-compact.png?v='+BUILD;
 
   function trueMobile(){
@@ -24,7 +24,6 @@
   function prepareCard(doc,card,mobile){
     const oldBrand=card.querySelector('.auth-brand'); if(oldBrand) oldBrand.hidden=true;
     const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
-
     const forgot=card.querySelector('#ljiForgotPassword');
     if(forgot && !card.querySelector('.lji-login-controls,.lji-m-login-controls')){
       const controls=doc.createElement('div');
@@ -35,7 +34,6 @@
       forgot.parentNode.insertBefore(controls,forgot);
       controls.appendChild(forgot);
     }
-
     const login=card.querySelector('#ljiAuthLogin');
     if(login && !card.querySelector('.lji-login-divider,.lji-m-divider')){
       const divider=doc.createElement('div');
@@ -56,7 +54,6 @@
     const card=overlay&&overlay.querySelector('.auth-card');
     if(!overlay||!card) throw new Error('auth_overlay_missing');
     prepareCard(doc,card,mobile);
-
     if(mobile){
       overlay.className='auth-overlay lji-mobile-login-v25';
       overlay.dataset.mobileV25='1';
@@ -84,46 +81,38 @@
       left.innerHTML='<div class="lji-login-edge-copy"><i></i><span>MAIS MERCADO</span><span>MAIS OPORTUNIDADES</span><span>MAIS RESULTADOS</span></div><div class="lji-login-left-inner"><div class="lji-login-brand" aria-label="LJ Radar Imob"><img class="lji-login-logo" src="'+logo+'" alt="LJ Radar Imob"><p>Inteligência imobiliária para captação e oportunidades.</p></div></div><div class="lji-login-footer">LJ Radar Imob &nbsp; © 2026</div>';
       left.querySelector('.lji-login-left-inner').appendChild(card);
       const support=doc.createElement('button'); support.type='button'; support.className='lji-login-support'; support.textContent='◉  Falar com suporte'; support.setAttribute('data-lji-support','1'); left.querySelector('.lji-login-left-inner').appendChild(support);
-
       const hero=doc.createElement('section'); hero.className='lji-login-hero';
       hero.innerHTML='<div class="lji-login-lang"><span>Brasil</span><i></i><span>PT-BR</span></div><div class="lji-login-hero-copy"><small>ANÁLISE &nbsp; · &nbsp; DADOS &nbsp; · &nbsp; OPERAÇÃO</small><h2>O mercado<br>imobiliário com<br><strong>mais inteligência.</strong></h2><em></em><p>ENCONTRE IMÓVEIS.<br>IDENTIFIQUE OPORTUNIDADES.<br>ANTECIPE MOVIMENTOS.</p></div><div class="lji-login-hero-radar" role="img" aria-label="Radar LJ"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="beam"></span><b></b></div><div class="lji-login-float lji-float-a"><strong>Apartamento</strong><span>Oportunidade detectada</span></div><div class="lji-login-float lji-float-b"><strong>Casa</strong><span>Alto potencial</span></div><div class="lji-login-float lji-float-c"><strong>Terreno</strong><span>Novo sinal no mercado</span></div><blockquote>“Dados transformam<br>o mercado em oportunidades.”</blockquote><div class="lji-login-bottom-words">DADOS <b>·</b> PESSOAS <b>·</b> OPORTUNIDADES <b>·</b> RESULTADOS</div>';
       overlay.replaceChildren(shell); shell.append(left,hero);
     }
   }
 
-  function appendCss(doc,href,media){
-    const link=doc.createElement('link'); link.rel='stylesheet'; link.href=href; if(media) link.media=media; doc.head.appendChild(link);
-  }
-  function appendScript(doc,src){ const s=doc.createElement('script'); s.src=src; doc.body.appendChild(s); }
+  function appendCss(doc,href,media){const link=doc.createElement('link');link.rel='stylesheet';link.href=href;if(media)link.media=media;doc.head.appendChild(link);}
+  function appendScript(doc,src){const s=doc.createElement('script');s.src=src;doc.body.appendChild(s);}
 
   try{
     const response=await fetch('./app-shell-v22.50.4.html?boot='+BUST,{cache:'no-store'});
     if(!response.ok) throw new Error('shell_http_'+response.status);
     let html=await response.text();
     html=html.replaceAll('?v=22.50.4','?v='+BUILD);
-    html=html.replace('v22.50.4 · Filtros de Qualidade','v'+BUILD+' · Central de Captação');
+    html=html.replace('v22.50.4 · Filtros de Qualidade','v'+BUILD+' · Operação estilo Gmail');
     html=html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v'+BUILD+' · © 2026');
-    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Central de Captação · 11/09/2026 -->');
-
+    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Gmail Operational UI · 11/09/2026 -->');
     const doc=new DOMParser().parseFromString(html,'text/html');
-
-    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js','qualified-leads-v29.js'];
-    doc.querySelectorAll('script[src]').forEach(s=>{ if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n))) s.remove(); });
-    doc.querySelectorAll('link[href]').forEach(l=>{ const h=l.getAttribute('href'); if(/desktop-layout-v23|desktop-login-polish-v23|dashboard-v24|mobile-v25|capture-center-v29/.test(h)) l.remove(); });
-
+    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js','qualified-leads-v29.js','gmail-system-v29.js'];
+    doc.querySelectorAll('script[src]').forEach(s=>{if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n)))s.remove();});
+    doc.querySelectorAll('link[href]').forEach(l=>{const h=l.getAttribute('href');if(/desktop-layout-v23|desktop-login-polish-v23|dashboard-v24|mobile-v25|capture-center-v29|gmail-system-v29/.test(h))l.remove();});
     appendCss(doc,'./desktop-layout-v23.css?v='+BUILD);
     appendCss(doc,'./desktop-layout-v23-hotfix.css?v='+BUILD);
     appendCss(doc,'./desktop-login-polish-v23.css?v='+BUILD);
     appendCss(doc,'./dashboard-v24.css?v='+BUILD);
     appendCss(doc,'./mobile-v25.css?v='+BUILD,'(max-width: 900px)');
     appendCss(doc,'./capture-center-v29.css?v='+BUILD);
-
+    appendCss(doc,'./gmail-system-v29.css?v='+BUILD);
     const bg=doc.createElement('style');
     bg.textContent='.lji-login-hero{background-image:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.96) 13%,rgba(255,255,255,.82) 29%,rgba(255,255,255,.54) 46%,rgba(255,255,255,.24) 63%,rgba(255,255,255,.08) 82%,rgba(255,255,255,.03) 100%),linear-gradient(180deg,rgba(244,249,255,.08),rgba(13,54,112,.17)),url(https://images.unsplash.com/photo-1773643331825-52bdcd45edca?auto=format&fit=crop&fm=jpg&q=78&w=2600)!important;background-position:center 48%!important;background-size:cover!important;background-repeat:no-repeat!important}.lji-m-login-hero{background-image:linear-gradient(90deg,rgba(255,255,255,.52) 0%,rgba(255,255,255,.28) 38%,rgba(255,255,255,.08) 100%),linear-gradient(180deg,rgba(237,246,255,.08) 0%,rgba(13,48,101,.20) 72%,rgba(255,255,255,.20) 100%),url(https://images.unsplash.com/photo-1773643331825-52bdcd45edca?auto=format&fit=crop&fm=jpg&q=78&w=1600)!important;background-position:center 44%!important;background-size:cover!important;background-repeat:no-repeat!important}';
     doc.head.appendChild(bg);
-
     buildApprovedAuth(doc,trueMobile());
-
     appendScript(doc,'./desktop-layout-v23.js?v='+BUILD);
     appendScript(doc,'./dashboard-v24.js?v='+BUILD);
     appendScript(doc,'./mobile-v25.js?v='+BUILD);
@@ -131,17 +120,13 @@
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
     appendScript(doc,'./capture-collector-v29.js?v='+BUILD);
     appendScript(doc,'./qualified-leads-v29.js?v='+BUILD);
-
+    appendScript(doc,'./gmail-system-v29.js?v='+BUILD);
     const behavior=doc.createElement('script');
     behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';info.classList.add('lji-auth-info-visible');}if(e.target.closest('[data-lji-support]')&&info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block';info.classList.add('lji-auth-info-visible');}});";
     doc.body.appendChild(behavior);
-
     const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
-    document.open(); document.write(out); document.close();
-  }catch(error){
-    console.error('LJ Radar boot failed',error);
-    document.body.innerHTML='<div class="lji-boot">Não foi possível carregar o LJ Radar. Atualize a página.</div>';
-  }
+    document.open();document.write(out);document.close();
+  }catch(error){console.error('LJ Radar boot failed',error);document.body.innerHTML='<div class="lji-boot">Não foi possível carregar o LJ Radar. Atualize a página.</div>';}
 })();
 </script>
 </body>
