@@ -403,7 +403,7 @@ export async function collectApifyTask(request, {
     return { ok: false, status: 'not_configured', source, results: [], error: `APIFY_TASK_${source.toUpperCase()}_missing` };
   }
 
-  const maxItems = Math.max(1, Math.min(80, Number(request.limit || 30)));
+  const maxItems = Math.max(1, Math.min(200, Number(request.limit || 30)));
   const taskInput = buildTaskInput(request, source, maxItems, facebookGroupUrls);
   if (!taskInput) {
     return { ok: false, status: 'unsupported_target', source, results: [], error: `${source}_target_not_supported_by_pilot` };
