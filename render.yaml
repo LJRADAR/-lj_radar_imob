@@ -22,13 +22,17 @@ services:
         sync: false
       - key: APIFY_TASK_FACEBOOK
         sync: false
+      - key: APIFY_FACEBOOK_GROUP_URLS
+        sync: false
+      - key: LJI_FACEBOOK_PILOT_ON_BOOT
+        value: "0"
       - key: APIFY_TASK_TELEGRAM
         sync: false
       - key: APIFY_TASK_QUINTO
         sync: false
       - key: APIFY_MAX_CHARGE_USD
-        value: "0.25"
+        value: "0.38"
       - key: APIFY_TIMEOUT_SECS
-        value: "35"
+        value: "40"
       - key: SOURCE_REQUEST_TIMEOUT_MS
         value: "40000"
