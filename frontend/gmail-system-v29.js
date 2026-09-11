@@ -1,5 +1,6 @@
 'use strict';
-/* LJ Radar Imob — Gmail operational layer v29.4 */
+/* LJ Radar Imob — Gmail operational layer v29.4
+   v30: extensão v29.5 é carregada somente pelo boot, evitando listeners/observers duplicados. */
 (function(){
   const PAGE_IDS=['capture-center','qualified-leads','buyers','owners','whatsapp-leads','para-quinto-andar','deep-search','discarded','intentions','matches','trades','pipeline','sales-inbox','companies'];
   const q=(s,r=document)=>r.querySelector(s), qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
@@ -15,7 +16,7 @@
   function extractId(row,kind){
     const html=row.innerHTML||'';
     if(kind==='buyers') return html.match(/deleteBuyer\('([^']+)'\)/)?.[1]||'';
-    if(kind==='owners') return html.match(/openPropertyMenu\(event,'([^']+)'\)/)?.[1]||'';
+    if(kind==='owners') return html.match(/openPropertyMenu\(event,'([^']+)'\)/)?.[1]||html.match(/openRegistryForProperty\('([^']+)'\)/)?.[1]||'';
     return '';
   }
 
@@ -89,15 +90,4 @@
   const observer=new MutationObserver(()=>{clearTimeout(observer._t);observer._t=setTimeout(run,60)});
   function init(){run();observer.observe(document.body,{subtree:true,childList:true});setInterval(run,1800)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
-
-/* v29.5 extension loader */
-(function(){
-  if(!document.querySelector('link[data-lji-gmail-295]')){
-    const l=document.createElement('link');l.rel='stylesheet';l.href='./gmail-system-v29-5.css?v=29.5.0';l.dataset.ljiGmail295='1';document.head.appendChild(l);
-  }
-  if(!document.querySelector('script[data-lji-gmail-295]')){
-    const s=document.createElement('script');s.src='./gmail-system-v29-5.js?v=29.5.0';s.dataset.ljiGmail295='1';document.body.appendChild(s);
-  }
-  document.documentElement.dataset.ljiBuild='29.5.0';
 })();
