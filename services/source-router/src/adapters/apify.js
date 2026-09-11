@@ -168,7 +168,7 @@ function priceFromText(title, description, transactionType) {
 
 function contactPhoneFromText(title, description) {
   const raw = `${title || ''} ${description || ''}`;
-  const match = raw.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/);
+  const match = raw.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9?\d{4}[-\s]?\d{4}|9\d{4}[-\s]?\d{2}[-\s]?\d{2})/);
   return match ? match[0].trim() : null;
 }
 
@@ -294,32 +294,37 @@ export function normalizeApifyItem(item, request, source) {
   const properties = Array.isArray(item?.properties) ? item.properties : [];
   const images = Array.isArray(item?.photos) ? item.photos : Array.isArray(item?.images) ? item.images : [];
   const attachments = Array.isArray(item?.attachments) ? item.attachments : [];
+  const attachmentOcrText = attachments
+    .map((entry) => text(entry?.ocrText))
+    .filter(Boolean)
+    .join('\n');
+  const inferenceDescription = [description, attachmentOcrText].filter(Boolean).join('\n');
   const category = text(first(item, ['property_type', 'propertyType', 'type', 'categoryName', 'category']));
   const transactionType = source === 'facebook'
-    ? inferTransactionType(title, description, request.transaction_type)
+    ? inferTransactionType(title, inferenceDescription, request.transaction_type)
     : request.transaction_type;
   const propertyType = source === 'facebook'
-    ? normalizePropertyType(category) || inferPropertyTypeFromText(title, description) || normalizePropertyType(request.property_type_code)
-    : normalizePropertyType(request.property_type_code) || normalizePropertyType(category) || inferPropertyTypeFromText(title, description);
+    ? normalizePropertyType(category) || inferPropertyTypeFromText(title, inferenceDescription) || normalizePropertyType(request.property_type_code)
+    : normalizePropertyType(request.property_type_code) || normalizePropertyType(category) || inferPropertyTypeFromText(title, inferenceDescription);
 
   const areaM2 = parseMoney(first(item, ['area_m2', 'areaM2', 'area', 'floorSize']))
     ?? propertyMetric(properties, ['Área útil', 'Area util', 'Área', 'Area', 'Metragem']);
   const bedrooms = parseMoney(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
     ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios'])
-    ?? metricFromText(title, description, [/(\d+)\s*(?:dorm(?:it[oó]rios?)?|quartos?|beds?)\b/i]);
+    ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:dorm(?:it[oó]rios?)?|quartos?|beds?)\b/i]);
   const bathrooms = parseMoney(first(item, ['bathrooms', 'bathroomCount']))
     ?? propertyMetric(properties, ['Banheiros', 'Banheiro'])
-    ?? metricFromText(title, description, [/(\d+)\s*(?:banheiros?|baths?)\b/i]);
+    ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:banheiros?|baths?)\b/i]);
   const parkingSpaces = parseMoney(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
     ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem'])
-    ?? metricFromText(title, description, [/(\d+)\s*(?:vagas?|garagens?)\b/i]);
-  const price = parseMoney(first(item, ['price', 'amount', 'value'])) ?? priceFromText(title, description, transactionType);
-  const phone = text(first(item, ['phone', 'telephone', 'contactPhone'])) || contactPhoneFromText(title, description);
-  const whatsapp = text(first(item, ['whatsapp', 'whatsappUrl'])) || whatsappFromText(title, description);
+    ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:vagas?|garagens?)\b/i]);
+  const price = parseMoney(first(item, ['price', 'amount', 'value'])) ?? priceFromText(title, inferenceDescription, transactionType);
+  const phone = text(first(item, ['phone', 'telephone', 'contactPhone'])) || contactPhoneFromText(title, inferenceDescription);
+  const whatsapp = text(first(item, ['whatsapp', 'whatsappUrl'])) || whatsappFromText(title, inferenceDescription);
   const attachmentImage = attachments
     .map((entry) => text(entry?.thumbnail) || text(entry?.photo_image?.uri) || text(entry?.image?.uri))
     .find(Boolean) || null;
-  const tradeSignal = /\b(permuta|permutar|troco|troca por imovel|aceita troca)\b/.test(textBlob(title, description));
+  const tradeSignal = /\b(permuta|permutar|troco|troca por imovel|aceita troca)\b/.test(textBlob(title, inferenceDescription));
 
   return {
     source_name: SOURCE_LABELS[source] || `Apify ${source}`,
@@ -354,6 +359,7 @@ export function normalizeApifyItem(item, request, source) {
       facebook_group_url: text(first(item, ['facebookUrl', 'inputUrl'])),
       facebook_group_title: text(first(item, ['groupTitle'])),
       raw_location: rawLocation,
+      attachment_ocr_text: attachmentOcrText || null,
       transaction_inferred: transactionType !== request.transaction_type,
       trade_signal: tradeSignal,
       properties,
