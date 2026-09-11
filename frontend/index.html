@@ -10,8 +10,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='29.0.0';
-  const BUST='20260910-capture-center-gmail-1';
+  const BUILD='29.2.0';
+  const BUST='20260911-capture-collector-1';
   const logo='./lj-logo-compact.png?v='+BUILD;
 
   function trueMobile(){
@@ -103,11 +103,11 @@
     html=html.replaceAll('?v=22.50.4','?v='+BUILD);
     html=html.replace('v22.50.4 · Filtros de Qualidade','v'+BUILD+' · Central de Captação');
     html=html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v'+BUILD+' · © 2026');
-    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Central de Captação · 10/09/2026 -->');
+    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Central de Captação · 11/09/2026 -->');
 
     const doc=new DOMParser().parseFromString(html,'text/html');
 
-    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js'];
+    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js'];
     doc.querySelectorAll('script[src]').forEach(s=>{ if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n))) s.remove(); });
     doc.querySelectorAll('link[href]').forEach(l=>{ const h=l.getAttribute('href'); if(/desktop-layout-v23|desktop-login-polish-v23|dashboard-v24|mobile-v25|capture-center-v29/.test(h)) l.remove(); });
 
@@ -129,6 +129,7 @@
     appendScript(doc,'./mobile-v25.js?v='+BUILD);
     appendScript(doc,'./desktop-login-polish-v23.js?v='+BUILD);
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
+    appendScript(doc,'./capture-collector-v29.js?v='+BUILD);
 
     const behavior=doc.createElement('script');
     behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';info.classList.add('lji-auth-info-visible');}if(e.target.closest('[data-lji-support]')&&info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block';info.classList.add('lji-auth-info-visible');}});";
