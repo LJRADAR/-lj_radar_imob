@@ -18,6 +18,23 @@ test('parseMoney handles Brazilian and marketplace thousands correctly', () => {
   assert.equal(scaled.price, 350000);
 });
 
+test('facebook zero price falls back to price stated in post text', () => {
+  const row = normalizeApifyItem({
+    url: 'https://www.facebook.com/groups/x/permalink/10/',
+    title: 'Alugo apartamento no jd arco íris valor 1200 reais incluso condomínio',
+    text: 'Alugo apartamento no jd arco íris valor 1200 reais incluso condomínio, interessados 11911236688',
+    price: 0,
+  }, {
+    city: 'Santo André',
+    transaction_type: 'rent',
+    property_type_code: null,
+  }, 'facebook');
+
+  assert.equal(row.transaction_type, 'rent');
+  assert.equal(row.price, 1200);
+  assert.equal(row.property_type, 'Apartamento');
+});
+
 test('facebook transaction is inferred from the post instead of the requested run', () => {
   assert.equal(inferTransactionType('Apartamento', 'Aluguel 1.800,00 direto com proprietária', 'sale'), 'rent');
   assert.equal(inferTransactionType('Casa à venda', 'Vendo minha casa', 'rent'), 'sale');
