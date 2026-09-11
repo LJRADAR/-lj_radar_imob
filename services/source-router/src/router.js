@@ -17,7 +17,7 @@ export function validateRequest(body) {
     city: String(body?.city || '').trim(),
     transaction_type: body?.transaction_type === 'rent' ? 'rent' : body?.transaction_type === 'sale' ? 'sale' : null,
     property_type_code: body?.property_type_code ? String(body.property_type_code).trim() : null,
-    limit: Math.max(1, Math.min(80, Number(body?.limit || 30))),
+    limit: Math.max(1, Math.min(200, Number(body?.limit || 30))),
   };
   if (request.state_code !== 'SP') return { ok: false, error: 'state_not_supported' };
   if (!CORE_TARGETS.has(request.city)) return { ok: false, error: 'city_not_in_core_operation' };
