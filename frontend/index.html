@@ -10,8 +10,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='29.2.0';
-  const BUST='20260911-capture-collector-1';
+  const BUILD='29.3.0';
+  const BUST='20260911-qualified-leads-1';
   const logo='./lj-logo-compact.png?v='+BUILD;
 
   function trueMobile(){
@@ -107,7 +107,7 @@
 
     const doc=new DOMParser().parseFromString(html,'text/html');
 
-    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js'];
+    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js','qualified-leads-v29.js'];
     doc.querySelectorAll('script[src]').forEach(s=>{ if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n))) s.remove(); });
     doc.querySelectorAll('link[href]').forEach(l=>{ const h=l.getAttribute('href'); if(/desktop-layout-v23|desktop-login-polish-v23|dashboard-v24|mobile-v25|capture-center-v29/.test(h)) l.remove(); });
 
@@ -130,6 +130,7 @@
     appendScript(doc,'./desktop-login-polish-v23.js?v='+BUILD);
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
     appendScript(doc,'./capture-collector-v29.js?v='+BUILD);
+    appendScript(doc,'./qualified-leads-v29.js?v='+BUILD);
 
     const behavior=doc.createElement('script');
     behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';info.classList.add('lji-auth-info-visible');}if(e.target.closest('[data-lji-support]')&&info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block';info.classList.add('lji-auth-info-visible');}});";
