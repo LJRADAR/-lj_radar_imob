@@ -1,0 +1,23 @@
+/* LJ Radar Imob — Gmail operational layer v29.4 */
+.page.lji-gmail-page .card,
+.page.lji-gmail-page .desktop-table-wrap,
+.page.lji-gmail-page table{border-radius:12px!important}
+.page.lji-gmail-page .card{box-shadow:none!important;border:1px solid rgba(25,55,95,.12)!important;background:#fff!important}
+.page.lji-gmail-page table{width:100%;border-collapse:collapse!important;background:#fff!important}
+.page.lji-gmail-page thead th{position:sticky;top:0;z-index:2;background:#f7f9fc!important;color:#42526b!important;font-size:11px!important;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid rgba(25,55,95,.13)!important;padding:10px 12px!important}
+.page.lji-gmail-page tbody tr{transition:background .14s ease,box-shadow .14s ease;border-bottom:1px solid rgba(25,55,95,.08)!important}
+.page.lji-gmail-page tbody tr:nth-child(even){background:#fbfcfe}
+.page.lji-gmail-page tbody tr:hover{background:#f1f6ff!important;box-shadow:inset 3px 0 0 var(--accent,#1857b6)}
+.page.lji-gmail-page tbody tr.lji-row-selected{background:#eaf2ff!important;box-shadow:inset 3px 0 0 var(--accent,#1857b6)}
+.page.lji-gmail-page td{padding:10px 12px!important;vertical-align:middle!important;font-size:13px!important}
+.lji-gmail-toolbar{display:flex;align-items:center;gap:7px;min-height:44px;padding:7px 10px;margin:10px 0;background:#fff;border:1px solid rgba(25,55,95,.12);border-radius:12px;box-shadow:0 1px 2px rgba(20,45,85,.04)}
+.lji-gmail-toolbar button{height:32px;padding:0 11px;border:1px solid rgba(25,55,95,.14);border-radius:8px;background:#fff;color:#314158;font-weight:700;font-size:12px;cursor:pointer}
+.lji-gmail-toolbar button:hover{background:#f3f7fd}
+.lji-gmail-toolbar button:disabled{opacity:.38;cursor:not-allowed}
+.lji-gmail-toolbar .lji-gmail-danger{color:#a02b2b}
+.lji-gmail-toolbar .lji-gmail-count{margin-left:auto;color:#68768a;font-size:12px;font-weight:700}
+.lji-gmail-check{width:38px!important;text-align:center!important;padding-left:8px!important;padding-right:8px!important}
+.lji-gmail-check input{width:16px;height:16px;accent-color:var(--accent,#1857b6);cursor:pointer}
+.page.lji-gmail-page .mobile-card-list .m-card{border:1px solid rgba(25,55,95,.12)!important;border-radius:12px!important;box-shadow:none!important}
+.page.lji-gmail-page .mobile-card-list .m-card:hover{background:#f6f9fe}
+@media(max-width:900px){.lji-gmail-toolbar{overflow:auto;white-space:nowrap}.lji-gmail-toolbar .lji-gmail-count{margin-left:8px}.page.lji-gmail-page td{padding:9px 8px!important}}
