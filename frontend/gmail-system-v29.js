@@ -14,16 +14,14 @@
 
   function extractId(row,kind){
     const html=row.innerHTML||'';
-    let m=null;
-    if(kind==='buyers') m=html.match(/deleteBuyer\('([^']+)'\)/);
-    if(kind==='owners') m=html.match(/(?:openPropertyMenu\(event,|openRegistryForProperty\()'([^']+)'/);
-    return m?.[1]||'';
+    if(kind==='buyers') return html.match(/deleteBuyer\('([^']+)'\)/)?.[1]||'';
+    if(kind==='owners') return html.match(/openPropertyMenu\(event,'([^']+)'\)/)?.[1]||'';
+    return '';
   }
 
   function toolbar(kind,root){
     const id='ljiGmailToolbar-'+kind;
-    let bar=q('#'+id);
-    if(bar)return bar;
+    let bar=q('#'+id);if(bar)return bar;
     bar=document.createElement('div');bar.id=id;bar.className='lji-gmail-toolbar';
     const isBuyer=kind==='buyers';
     bar.innerHTML=`<label class="lji-gmail-check" title="Selecionar todos"><input type="checkbox" data-gmail-all="${kind}"></label>
@@ -31,8 +29,7 @@
       <button type="button" data-gmail-archive="${kind}" disabled>${isBuyer?'Arquivar':'Remover prioridade'}</button>
       <button type="button" class="lji-gmail-danger" data-gmail-trash="${kind}" disabled>${isBuyer?'Lixeira':'Descartar'}</button>
       <span class="lji-gmail-count" data-gmail-count="${kind}">0 selecionados</span>`;
-    root.parentElement?.insertBefore(bar,root);
-    return bar;
+    root.parentElement?.insertBefore(bar,root);return bar;
   }
 
   function enhanceRows(kind){
@@ -44,13 +41,13 @@
     qa('tbody tr',table).forEach(row=>{
       const id=extractId(row,kind);if(!id)return;row.dataset.gmailId=id;
       if(!q('[data-gmail-row]',row)){const td=document.createElement('td');td.className='lji-gmail-check';td.dataset.gmailRow=kind;td.innerHTML=`<input type="checkbox" data-gmail-check="${kind}" data-id="${id}">`;row.prepend(td)}
-      const checked=selected[kind].has(id);const input=q('[data-gmail-check]',row);if(input)input.checked=checked;row.classList.toggle('lji-row-selected',checked);
+      const checked=selected[kind].has(id),input=q('[data-gmail-check]',row);if(input)input.checked=checked;row.classList.toggle('lji-row-selected',checked);
     });
     updateBar(kind);
   }
 
   function updateBar(kind){
-    const n=selected[kind].size;const count=q(`[data-gmail-count="${kind}"]`);if(count)count.textContent=`${n} selecionado${n===1?'':'s'}`;
+    const n=selected[kind].size,count=q(`[data-gmail-count="${kind}"]`);if(count)count.textContent=`${n} selecionado${n===1?'':'s'}`;
     qa(`[data-gmail-archive="${kind}"],[data-gmail-trash="${kind}"]`).forEach(b=>b.disabled=busy||n===0);
     const rows=qa(`#${kind==='buyers'?'buyersTable':'ownersTable'} tbody tr[data-gmail-id]`);
     qa(`[data-gmail-all="${kind}"]`).forEach(all=>{all.checked=rows.length>0&&rows.every(r=>selected[kind].has(r.dataset.gmailId));all.indeterminate=n>0&&!all.checked});
@@ -61,8 +58,7 @@
     busy=true;updateBar('buyers');
     try{
       const status=action==='trash'?'trash':'inactive';
-      const {error}=await client.from('lji_buyers').update({status}).eq('workspace_id',workspace).in('id',ids);
-      if(error)throw error;
+      const {error}=await client.from('lji_buyers').update({status}).eq('workspace_id',workspace).in('id',ids);if(error)throw error;
       selected.buyers.clear();toast(action==='trash'?'Compradores enviados para a lixeira.':'Compradores arquivados.');await window.LJI_BACKEND?.sync?.();
     }catch(e){console.error('Gmail buyers bulk:',e);toast('Não foi possível concluir a ação em lote.')}finally{busy=false;setTimeout(()=>enhanceRows('buyers'),80)}
   }
@@ -71,11 +67,9 @@
     const ids=[...selected.owners];if(!ids.length)return;
     busy=true;updateBar('owners');
     try{
-      for(const id of ids){
-        const o=(window.owners||[]).find(x=>String(x.id)===String(id));
-        const opportunityId=o?.opportunity_id||id;
-        if(action==='trash'){await window.setOwnerRadarStatus?.(opportunityId,'rejected')}
-        else{await window.setOwnerRadarStatus?.(opportunityId,'approved')}
+      for(const opportunityId of ids){
+        if(action==='trash') await window.setOwnerRadarStatus?.(opportunityId,'rejected');
+        else await window.setOwnerRadarStatus?.(opportunityId,'approved');
       }
       selected.owners.clear();toast(action==='trash'?'Proprietários descartados.':'Prioridade removida.');await window.LJI_BACKEND?.sync?.();
     }catch(e){console.error('Gmail owners bulk:',e);toast('Não foi possível concluir a ação em lote.')}finally{busy=false;setTimeout(()=>enhanceRows('owners'),100)}
