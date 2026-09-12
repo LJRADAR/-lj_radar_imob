@@ -245,7 +245,7 @@
       const [{data:members,error:membersErr},{data:profiles,error:profilesErr},{data:runs,error:runsErr},{data:activities,error:activityErr},{data:pipelineEvents,error:pipelineErr}] = await Promise.all([
         sb.from('lji_workspace_members').select('user_id,role,is_active,permissions,created_at').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:true}),
         sb.from('lj_profiles').select('user_id,full_name,role,active'),
-        sb.from('lj_v2_collector_runs').select('id,workspace_id,run_mode,status,city,transaction_type,total_raw_results,total_new_results,total_errors,created_at,started_at,finished_at').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(100),
+        sb.from('lj_v2_collector_runs').select('id,workspace_id,run_mode,status,city,transaction_type,total_raw_results,total_new_results,total_errors,total_queries,counters,error_message,created_at,started_at,finished_at').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(100),
         sb.from('lji_activity_log').select('id,user_id,event_type,entity_type,entity_id,details,created_at').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(100),
         sb.from('lji_activity_log').select('id,user_id,event_type,entity_type,entity_id,details,created_at').eq('workspace_id',cfg.WORKSPACE_ID).in('event_type',['pipeline_stage_changed','sales_note_added','sales_contact_logged','sales_action_queued','sales_action_approved','sales_action_completed','sales_action_cancelled','sales_agent_draft','whatsapp_message_received','whatsapp_message_sent','whatsapp_message_failed','whatsapp_lead_linked','sales_inbox_analysis','sales_match_profile','whatsapp_thread_read']).order('created_at',{ascending:false}).limit(3000)
       ]);
@@ -318,6 +318,13 @@
       return;
     }
     const when=run.created_at?new Date(run.created_at).toLocaleString('pt-BR'):'data não informada';
+    const ageHours=run.created_at?Math.max(0,(Date.now()-new Date(run.created_at).getTime())/36e5):Infinity;
+    if(ageHours>6 && ['completed','partial','running'].includes(String(run.status||''))){
+      banner.classList.add('collector-error');
+      title.textContent='Coleta atrasada';
+      meta.textContent=`Última execução ${when} · ${ageHours>=24?Math.floor(ageHours/24)+' dia(s)':Math.floor(ageHours)+' hora(s)'} sem nova rodada. A base existente permanece preservada.`;
+      return;
+    }
     if(run.status==='completed'||run.status==='partial'){
       banner.classList.add('collector-ok');
       title.textContent=run.status==='completed'?'Coletor servidor V2 ativo':'Coletor servidor V2 · execução parcial';
@@ -458,13 +465,14 @@
         sb.from('lji_discovered_leads').select('*').eq('workspace_id',cfg.WORKSPACE_ID).order('published_at',{ascending:false,nullsFirst:false}).order('discovered_at',{ascending:false}),
         sb.from('lj_v2_sources').select('id,name,domain,source_type,priority_tier,is_active'),
         sb.from('lj_v2_collector_source_profiles').select('source_id,is_active,total_queries,total_results,total_new_results,total_approved_leads,last_query_at'),
-        sb.from('lj_v2_collector_runs').select('status,workspace_id,created_at,total_new_results,total_errors,total_queries,error_message').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(1).maybeSingle()
+        sb.from('lj_v2_collector_runs').select('status,workspace_id,created_at,total_new_results,total_errors,total_queries,counters,error_message').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(1).maybeSingle()
       ]);
       if(!leadRes.error && Array.isArray(leadRes.data)) discoveredLeads=leadRes.data;
       else if(leadRes.error) noteRuntimeWarning('leads descobertos',leadRes.error);
       const profiles=new Map((!profileRes.error&&Array.isArray(profileRes.data)?profileRes.data:[]).map(p=>[String(p.source_id),p]));
       if(!sourceRes.error && Array.isArray(sourceRes.data)) sourceProfiles=(sourceRes.data||[]).map(s=>({...s,...(profiles.get(String(s.id))||{}),source_active:s.is_active}));
       else if(sourceRes.error) noteRuntimeWarning('fontes da coleta',sourceRes.error);
+      if(runRes.data){window.LJI_ADMIN_STATE=window.LJI_ADMIN_STATE||{};window.LJI_ADMIN_STATE.collectorRuns=[runRes.data,...(window.LJI_ADMIN_STATE.collectorRuns||[]).filter(r=>r.created_at!==runRes.data.created_at)].slice(0,100)}
       updateCollectorServerBanner(runRes.data,runRes.error);
       renderDeepSearch();
       refreshCitySelectors();
@@ -595,4 +603,3 @@
 
   initBackend().finally(()=>startAutoRefresh());
 })();
-

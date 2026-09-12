@@ -378,12 +378,26 @@ function contactHtml(o){
 function renderSourceCoverage(){
   const box=document.getElementById('sourceCoverage');if(!box)return;
   const names=['Facebook Grupos Públicos','Facebook Marketplace','Web aberta com contato','Facebook público','Web pública','OLX Imóveis'];
+  const latestRun=(window.LJI_ADMIN_STATE?.collectorRuns||[])[0]||null;
+  const reports=Array.isArray(latestRun?.counters?.source_report)?latestRun.counters.source_report:[];
+  const sourceKey=name=>{
+    const n=normalizePlain(name);
+    if(n.includes('facebook'))return'facebook';
+    if(n.includes('olx'))return'olx';
+    if(n.includes('instagram'))return'instagram';
+    if(n.includes('threads'))return'threads';
+    if(n.includes('telegram'))return'telegram';
+    return'';
+  };
   box.innerHTML=names.map(name=>{
     const p=sourceProfiles.find(x=>String(x.name).toLowerCase()===name.toLowerCase());
     const n=discoveredLeads.filter(x=>String(x.source).toLowerCase()===name.toLowerCase()).length + owners.filter(x=>String(x.source).toLowerCase()===name.toLowerCase()).length;
     const fb=name==='Facebook Marketplace'||name==='Facebook Grupos Públicos';
     const secondary=name==='OLX Imóveis';
-    return `<div class="source-card"><div class="source-card-top">${sourceBadge(name)}<span class="source-state ${p?.source_active!==false?'on':'off'}">${p?.source_active!==false?'Ativa':'Inativa'}</span></div><strong>${n}</strong><span>lead(s) visíveis</span><small>${secondary?'Fonte secundária: usada quando não há contato melhor em fontes abertas.':fb&&n===0?'Busca somente conteúdo público/indexado; grupos fechados não são acessados.':p?.last_query_at?'Última coleta: '+new Date(p.last_query_at).toLocaleString('pt-BR'):'Fonte configurada para coleta.'}</small></div>`;
+    const report=reports.find(r=>String(r.source||'').toLowerCase()===sourceKey(name));
+    const reportText=report?`Última rodada: ${Number(report.raw_count||0)} brutos · ${Number(report.qualified_count||0)} qualificados · ${Number(report.quality_rejected_count||0)} filtrados${report.error?' · falha':''}`:'';
+    const health=report?(report.ok?'on':'off'):(p?.source_active!==false?'on':'off');
+    return `<div class="source-card"><div class="source-card-top">${sourceBadge(name)}<span class="source-state ${health}">${report?(report.ok?'Operacional':'Falha'):p?.source_active!==false?'Ativa':'Inativa'}</span></div><strong>${n}</strong><span>lead(s) visíveis</span><small>${reportText|| (secondary?'Fonte secundária: usada quando não há contato melhor em fontes abertas.':fb&&n===0?'Busca somente conteúdo público/indexado; grupos fechados não são acessados.':p?.last_query_at?'Última coleta: '+new Date(p.last_query_at).toLocaleString('pt-BR'):'Fonte configurada para coleta.')}</small></div>`;
   }).join('');
 }
 function populateDiscoveryFilters(){
@@ -394,13 +408,13 @@ function populateDiscoveryFilters(){
   sf.value=sCur;cf.value=cCur;
 }
 function filteredDiscoveredLeads(){
-  const q=(document.getElementById('deepSearchInput')?.value||'').toLowerCase(),src=document.getElementById('deepSourceFilter')?.value||'',city=document.getElementById('deepCityFilter')?.value||'',direct=document.getElementById('deepOwnerFilter')?.value||'',contact=document.getElementById('deepContactFilter')?.value||'';
+  const q=(document.getElementById('deepSearchInput')?.value||'').toLowerCase(),src=document.getElementById('deepSourceFilter')?.value||'',city=document.getElementById('deepCityFilter')?.value||'',neighborhood=normalizePlain(document.getElementById('deepNeighborhoodFilter')?.value||''),direct=document.getElementById('deepOwnerFilter')?.value||'',contact=document.getElementById('deepContactFilter')?.value||'';
   return discoveredLeads.filter(x=>{
     const phone=phoneDigits(x.contact_verified_phone||x.contact_phone||'');const wa=whatsappFrom(x.whatsapp_url||phone);
     const contactOk=!contact||(contact==='whatsapp'&&!!wa)||(contact==='phone'&&!!phone)||(contact==='hidden'&&!phone&&!wa);
     const status=registryNorm(x.status),sourceName=registryNorm(x.source);
     const excluded=['rejected','discarded','not_approved','cancelled'].includes(status)||dashboardLooksProfessional(x)||Boolean(x.area_risk||x.risk_area||x.closed_community)||sourceName==='proprietario direto';
-    return !excluded&&(!q||[x.title,x.city,x.neighborhood,x.source,x.contact_method,x.contact_phone].join(' ').toLowerCase().includes(q))&&(!src||x.source===src)&&(!city||x.city===city)&&(!direct||x.owner_direct)&&contactOk;
+    return !excluded&&(!q||[x.title,x.city,x.neighborhood,x.source,x.contact_method,x.contact_phone].join(' ').toLowerCase().includes(q))&&(!src||x.source===src)&&(!city||x.city===city)&&(!neighborhood||normalizePlain(x.neighborhood).includes(neighborhood))&&(!direct||x.owner_direct)&&contactOk;
   });
 }
 function renderDeepSearch(){
@@ -440,6 +454,21 @@ function saveWorkbook(rows,name){
   Object.keys(ws).forEach(a=>{if(a[0]==='!')return;const c=ws[a];if(typeof c?.v==='string'&&/^https?:\/\//i.test(c.v))c.l={Target:c.v,Tooltip:'Abrir link'};});
   ws['!cols']=Object.keys(rows[0]||{}).map((k,i)=>({wch:Math.min(60,Math.max(12,Math.max(k.length,...rows.slice(0,80).map(r=>String(r[k]??'').length))+2))}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Leads');XLSX.writeFile(wb,name)
+}
+function saveWorkbookSheets(sheets,name){
+  if(!xlsxAvailable())return;
+  const entries=Object.entries(sheets||{}).filter(([,rows])=>Array.isArray(rows)&&rows.length);
+  if(!entries.length){toast('Nenhum lead real disponível para exportar.');return}
+  const wb=XLSX.utils.book_new();const used=new Set();
+  entries.forEach(([label,rows])=>{
+    const base=String(label||'Leads').replace(/[\\/?*\[\]:]/g,' ').trim().slice(0,31)||'Leads';
+    let sheet=base,i=2;while(used.has(sheet)){const suffix=` ${i++}`;sheet=base.slice(0,31-suffix.length)+suffix;}used.add(sheet);
+    const ws=XLSX.utils.json_to_sheet(rows);ws['!autofilter']={ref:ws['!ref']};
+    Object.keys(ws).forEach(a=>{if(a[0]==='!')return;const c=ws[a];if(typeof c?.v==='string'&&/^https?:\/\//i.test(c.v))c.l={Target:c.v,Tooltip:'Abrir link'}});
+    ws['!cols']=Object.keys(rows[0]||{}).map(k=>({wch:Math.min(60,Math.max(12,Math.max(k.length,...rows.slice(0,80).map(r=>String(r[k]??'').length))+2))}));
+    XLSX.utils.book_append_sheet(wb,ws,sheet);
+  });
+  XLSX.writeFile(wb,name);
 }
 function pdfAvailable(){return Boolean(window.jspdf?.jsPDF);}
 function exportRowsPdf(rows,title,file){
@@ -1177,8 +1206,8 @@ function renderRegistrySearches(){
   </article>`}).join('')}</div>`;
 }
 function renderOwners(){
- const q=(document.getElementById('ownerSearch')?.value||'').toLowerCase(),city=document.getElementById('ownerCity')?.value||'',hist=document.getElementById('ownerHistoryFilter')?.value||'';
- const rows=owners.filter(o=>(!q||(o.title+' '+o.city+' '+o.source).toLowerCase().includes(q))&&(!city||o.city===city)&&(!hist||(hist==='current'?o.is_current:!o.is_current)));
+ const q=(document.getElementById('ownerSearch')?.value||'').toLowerCase(),city=document.getElementById('ownerCity')?.value||'',neighborhood=normalizePlain(document.getElementById('ownerNeighborhood')?.value||''),hist=document.getElementById('ownerHistoryFilter')?.value||'';
+ const rows=owners.filter(o=>(!q||(o.title+' '+o.city+' '+o.neighborhood+' '+o.source).toLowerCase().includes(q))&&(!city||o.city===city)&&(!neighborhood||normalizePlain(o.neighborhood).includes(neighborhood))&&(!hist||(hist==='current'?o.is_current:!o.is_current)));
  const box=document.getElementById('ownersTable');
  if(!box)return;
  if(!rows.length){box.innerHTML='<div class="empty">Nenhum imóvel real encontrado.</div>';return}
@@ -1214,15 +1243,19 @@ function renderOwners(){
  box.innerHTML=`<div class="desktop-table-wrap"><table class="owners-pro-table"><thead><tr><th>Imóvel</th><th>Cidade</th><th>Valor</th><th>Perfil</th><th>Origem</th><th>Contato</th><th>Situação</th><th>Tratado por</th><th>Ações</th></tr></thead><tbody>${tableRows}</tbody></table></div><div class="mobile-card-list">${cards}</div>`;
 }
 function renderBuyers(){
+ const query=String(document.getElementById('buyerSearch')?.value||'').toLowerCase().trim();
+ const cityFilter=document.getElementById('buyerCityFilter')?.value||'';
+ const neighborhoodFilter=normalizePlain(document.getElementById('buyerNeighborhoodFilter')?.value||'');
+ const visibleBuyers=buyers.filter(b=>(!query||[b.name,b.city,b.neighborhood,b.type,b.source,b.contact].join(' ').toLowerCase().includes(query))&&(!cityFilter||b.city===cityFilter)&&(!neighborhoodFilter||normalizePlain(b.neighborhood).includes(neighborhoodFilter)));
  const matchedBuyerIds=new Set(allMatches().map(m=>String(m.buyer?.id||m.buyer?.name||'')));
  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=String(v)};
  set('bTotal',buyers.length);
  set('bWithContact',buyers.filter(b=>String(b.contact||'').trim()).length);
  set('bMatched',matchedBuyerIds.size);
  const box=document.getElementById('buyersTable');if(!box)return;
- if(!buyers.length){box.innerHTML='<div class="empty">Nenhuma demanda de comprador cadastrada.</div>';return}
- const tableRows=buyers.map(b=>`<tr><td><strong>${esc(b.name)}</strong><br><span class="small">${esc(b.contact||'')}</span></td><td>${esc(b.type)} · ${esc(b.city)}${b.neighborhood?' · '+esc(b.neighborhood):''} <span class="badge mid">${b.transaction_type==='rent'?'Locação':b.transaction_type==='both'?'Compra e locação':'Compra'}</span><br><span class="small">${esc(b.beds)}+ dorm · ${esc(b.parking)}+ vagas${Number(b.area_min||0)?' · '+esc(b.area_min)+'+ m²':''}</span></td><td>${esc(money(b.budget))}</td><td><span class="badge ${b.urgency===3?'hot':b.urgency===2?'good':'mid'}">${b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa'}</span></td><td>${esc(b.source)}</td><td><button class="danger" ${uiAction('deleteBuyer',[b.id],'click')}>Excluir</button></td></tr>`).join('');
- const cards=buyers.map(b=>{
+ if(!visibleBuyers.length){box.innerHTML='<div class="empty">Nenhuma demanda de comprador encontrada com estes filtros.</div>';return}
+ const tableRows=visibleBuyers.map(b=>`<tr><td><strong>${esc(b.name)}</strong><br><span class="small">${esc(b.contact||'')}</span></td><td>${esc(b.type)} · ${esc(b.city)}${b.neighborhood?' · '+esc(b.neighborhood):''} <span class="badge mid">${b.transaction_type==='rent'?'Locação':b.transaction_type==='both'?'Compra e locação':'Compra'}</span><br><span class="small">${esc(b.beds)}+ dorm · ${esc(b.parking)}+ vagas${Number(b.area_min||0)?' · '+esc(b.area_min)+'+ m²':''}</span></td><td>${esc(money(b.budget))}</td><td><span class="badge ${b.urgency===3?'hot':b.urgency===2?'good':'mid'}">${b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa'}</span></td><td>${esc(b.source)}</td><td><button class="danger" ${uiAction('deleteBuyer',[b.id],'click')}>Excluir</button></td></tr>`).join('');
+ const cards=visibleBuyers.map(b=>{
    const urg=b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa';
    const urgCls=b.urgency===3?'hot':b.urgency===2?'good':'mid';
    const mode=b.transaction_type==='rent'?'Locação':b.transaction_type==='both'?'Compra e locação':'Compra';
@@ -1865,9 +1898,37 @@ function companyExportRows(){const matches=allCompanyMatches();return companyDem
 function exportCompaniesExcel(){const rows=companyExportRows();if(!rows.length){toast('Nenhuma demanda corporativa ativa.');return}saveWorkbook(rows,`LJ-Radar-Imob-Empresas-${new Date().toISOString().slice(0,10)}.xlsx`)}
 function exportCompaniesPdf(){exportRowsPdf(companyExportRows(),'LJ Radar Imob — Empresas / Expansão',`LJ-Radar-Imob-Empresas-${new Date().toISOString().slice(0,10)}.pdf`)}
 
+function reportWindowDays(){const value=Number(document.getElementById('reportDaysFilter')?.value||30);return [3,7,30,90,365].includes(value)?value:30}
+function withinReportWindow(value,days=reportWindowDays()){
+  if(!value)return true;
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return true;
+  return d.getTime()>=Date.now()-days*86400000;
+}
+function reportOwnerRows(){return owners.filter(o=>o?.is_current&&o?.status!=='rejected'&&withinReportWindow(o.published_at||o.first_seen_at||o.created_at||o.last_seen_at))}
+function reportIntentRows(){return buyerIntentions.filter(i=>i?.status==='active'&&withinReportWindow(i.published_at||i.captured_at||i.created_at))}
+function exportAllOperationalLeadsExcel(){
+  const days=reportWindowDays();
+  const recent=(rows,dateKeys)=>rows.filter(row=>withinReportWindow(dateKeys.map(k=>row?.[k]).find(Boolean),days));
+  const ownersRows=reportOwnerRows();
+  const discoveryRows=recent(filteredDiscoveredLeads(),['published_at','discovered_at','created_at']);
+  const intentRows=filteredIntentionsExport().filter(row=>withinReportWindow(row.published_at||row.captured_at||row.created_at,days));
+  const sheets={
+    'Oportunidades atuais':ownerRowsForExcel(ownersRows),
+    'Captação recente':discoveryRowsForExcel(discoveryRows),
+    'Intenções ativas':intentionExportRows(intentRows),
+    'Compradores':buyersExportRows(),
+    'Matches':matchExportRows(),
+    'Permutas':tradeExportRows(),
+    'Empresas':companyExportRows()
+  };
+  saveWorkbookSheets(sheets,`LJ-Radar-Imob-Consolidado-${days}d-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function renderReports(){
   const matches=effectiveMatchScores().map(score=>({score})), tradeMatches=allTradeMatches(), corpMatches=allCompanyMatches();
-  const currentOwners=owners.filter(o=>o?.is_current&&o?.status!=='rejected');
+  const days=reportWindowDays();
+  const currentOwners=reportOwnerRows();
+  const reportIntentions=reportIntentRows();
   const vgv=currentOwners.reduce((s,o)=>s+Number(o.price||0),0), ticket=currentOwners.length?vgv/currentOwners.length:0;
   const commission=vgv*0.0125;
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
@@ -1879,7 +1940,7 @@ function renderReports(){
 
   const funnel=[
     ['Proprietários / imóveis atuais',currentOwners.length,'owners'],
-    ['Intenções reais',buyerIntentions.length,'intentions'],
+    ['Intenções reais',reportIntentions.length,'intentions'],
     ['Matches validados',matches.length,'matches'],
     ['Matches quentes (85%+)',matches.filter(x=>x.score>=85).length,'matches'],
     ['Permutas',tradeMatches.length,'trades'],
@@ -1893,20 +1954,21 @@ function renderReports(){
   </button>`).join('');
 
   const executive=document.getElementById('rExecutive');
-  if(executive) executive.innerHTML=`<div class="notice"><strong>Leitura comercial real:</strong> ${currentOwners.length} imóvel(is) atual(is), ${buyerIntentions.length} intenção(ões) ativa(s), ${matches.length} match(es) validado(s) e ${matches.filter(x=>x.score>=85).length} match(es) quente(s). VGV atual: ${money(vgv)}. Comissão potencial estimada em 1,25%: ${money(commission)}.</div>`;
+  if(executive) executive.innerHTML=`<div class="notice"><strong>Leitura comercial real (${days} dias):</strong> ${currentOwners.length} imóvel(is) atual(is), ${reportIntentions.length} intenção(ões) ativa(s), ${matches.length} match(es) validado(s) e ${matches.filter(x=>x.score>=85).length} match(es) quente(s). VGV atual: ${money(vgv)}. Comissão potencial estimada em 1,25%: ${money(commission)}.</div>`;
 }
 function exportReportCSV(){
+  const scopedOwners=reportOwnerRows(),scopedIntentions=reportIntentRows(),days=reportWindowDays();
   const rows=[
     ['Indicador','Valor'],
-    ['Proprietários',owners.length],['Intenções reais',buyerIntentions.length],['Matches validados',effectiveMatchScores().length],
+    ['Período (dias)',days],['Proprietários atuais',scopedOwners.length],['Intenções reais',scopedIntentions.length],['Matches validados',effectiveMatchScores().length],
     ['Matches quentes',effectiveMatchScores().filter(x=>x>=85).length],['Permutas',allTradeMatches().length],
     ['Permutas bidirecionais',allTradeMatches().filter(x=>x.bidirectional).length],
     ['Demandas corporativas',companyDemands.length],['Matches corporativos',allCompanyMatches().length],
-    ['VGV atual',owners.filter(o=>o?.is_current).reduce((s,o)=>s+Number(o.price||0),0)]
+    ['VGV atual',scopedOwners.reduce((s,o)=>s+Number(o.price||0),0)]
   ];
   const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
   const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lj-intelligence-relatorio.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`LJ-Radar-Imob-Relatorio-${days}d.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
 }
 
 
@@ -2045,7 +2107,7 @@ function filteredIntentionsExport(){
   const q=(document.getElementById('intentSearch')?.value||'').toLowerCase(),region=document.getElementById('intentRegionFilter')?.value||'',min=Number(document.getElementById('intentMinScore')?.value||0),statusFilter=document.getElementById('intentStatusFilter')?.value??'active',roleFilter=document.getElementById('intentRoleFilter')?.value||'',budgetOnly=document.getElementById('intentBudgetOnly')?.value==='1',contactOnly=document.getElementById('intentContactOnly')?.value==='1';
   return buyerIntentions.map(i=>({...i,_location:intentWantedLocation(i),_type:intentWantedType(i),_contact:intentPublicContact(i)})).filter(i=>{const active=i.status==='active',statusOk=statusFilter===''||(statusFilter==='active'&&active)||(statusFilter==='history'&&!active),blob=[i.person_name,i.title,i._location,i._type,i.source_name].join(' ').toLowerCase();return statusOk&&(!roleFilter||intentRole(i)===roleFilter)&&(!q||blob.includes(q))&&(!region||i.region===region||i._location.includes(region))&&Number(i.intent_score||0)>=min&&(!budgetOnly||Number(i.budget_max||0)>0)&&(!contactOnly||Boolean(i._contact));});
 }
-function intentionExportRows(){return filteredIntentionsExport().map(i=>({'Perfil':intentRole(i)==='seller'?'Proprietário':'Interessado','Pessoa / publicação':i.person_name||i.title||'','Intenção':intentActionLabel(i),'Tipo':i._type,'Região / local do imóvel':i._location,'Valor / orçamento':Number(i.budget_max||0),'Quartos':Number(i.bedrooms_min||0),'Vagas':Number(i.parking_min||0),'Score':Number(i.intent_score||0),'Status':i.status==='active'?'Ativa':'Histórico','Telefone':i._contact?.digits||'','WhatsApp':i._contact?.whatsapp||'','Fonte':i.source_name||'','Data de publicação':publicationLabel(i),'Link origem':i.source_url||''}))}
+function intentionExportRows(items=filteredIntentionsExport()){return items.map(i=>({'Perfil':intentRole(i)==='seller'?'Proprietário':'Interessado','Pessoa / publicação':i.person_name||i.title||'','Intenção':intentActionLabel(i),'Tipo':i._type,'Região / local do imóvel':i._location,'Valor / orçamento':Number(i.budget_max||0),'Quartos':Number(i.bedrooms_min||0),'Vagas':Number(i.parking_min||0),'Score':Number(i.intent_score||0),'Status':i.status==='active'?'Ativa':'Histórico','Telefone':i._contact?.digits||'','WhatsApp':i._contact?.whatsapp||'','Fonte':i.source_name||'','Data de publicação':publicationLabel(i),'Link origem':i.source_url||''}))}
 function exportIntentionsExcel(){const rows=intentionExportRows();if(!rows.length){toast('Nenhuma intenção no filtro atual.');return}saveWorkbook(rows,`LJ-Radar-Imob-Intencoes-${new Date().toISOString().slice(0,10)}.xlsx`)}
 function exportIntentionsPdf(){exportRowsPdf(intentionExportRows(),'LJ Radar Imob — Radar de Intenção',`LJ-Radar-Imob-Intencoes-${new Date().toISOString().slice(0,10)}.pdf`)}
 
@@ -2799,6 +2861,7 @@ function refreshCitySelectors(){
  const list=document.getElementById('ljiCityOptions');
  if(list)list.innerHTML=cities.map(c=>`<option value="${esc(c)}"></option>`).join('');
  refillCitySelect('ownerCity','Todas as regiões');
+ refillCitySelect('buyerCityFilter','Todas as regiões');
  refillCitySelect('dashRegion','Todas as regiões');
  refillCitySelect('intentRegionFilter','Todas as regiões');
  refreshBuyerNeighborhoodOptions();
