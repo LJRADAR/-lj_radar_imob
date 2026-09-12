@@ -13,8 +13,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='31.0.0';
-  const BUST='20260911-approved-login-image';
+  const BUILD='31.0.1';
+  const BUST='20260911-approved-login-image-live';
 
   function appendCss(doc,href,media){const link=doc.createElement('link');link.rel='stylesheet';link.href=href;if(media)link.media=media;doc.head.appendChild(link);}
   function appendScript(doc,src){const s=doc.createElement('script');s.src=src;doc.body.appendChild(s);}
@@ -32,18 +32,15 @@
     const oldBrand=card.querySelector('.auth-brand'); if(oldBrand) oldBrand.hidden=true;
     const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
     card.querySelectorAll('.lji-ref-card-head,.lji-approved-card-brand,.lji-m-brand,.lji-login-divider,.lji-m-divider,.lji-request-access,.lji-m-request,.lji-login-controls,.lji-m-login-controls').forEach(el=>el.remove());
-
     const forgot=card.querySelector('#ljiForgotPassword');
     const login=card.querySelector('#ljiAuthLogin');
     if(forgot) forgot.textContent='Esqueceu sua senha?';
-
     if(!card.querySelector('#ljiApprovedRemember')){
       const remember=doc.createElement('label');
       remember.className='lji-approved-remember';
       remember.innerHTML='<input id="ljiApprovedRemember" type="checkbox" checked><span></span><b>Lembrar acesso</b>';
       if(forgot) forgot.parentNode.insertBefore(remember,forgot); else if(login) login.parentNode.insertBefore(remember,login);
     }
-
     if(login){
       const request=doc.createElement('button');
       request.type='button';
@@ -52,7 +49,6 @@
       request.textContent='Solicitar acesso';
       login.insertAdjacentElement('afterend',request);
     }
-
     const info=card.querySelector('.auth-info');
     if(info) info.style.display='none';
   }
@@ -62,12 +58,10 @@
     const card=overlay&&overlay.querySelector('.auth-card');
     if(!overlay||!card) throw new Error('auth_overlay_missing');
     prepareCard(doc,card);
-
     overlay.className='auth-overlay lji-approved-image-login';
     overlay.dataset.v23Ready='1';
     overlay.dataset.mobileV25='1';
     overlay.dataset.approvedStatic='image-20260911';
-
     const stage=doc.createElement('div');
     stage.className='lji-approved-image-stage';
     const img=doc.createElement('img');
@@ -76,7 +70,6 @@
     img.alt='';
     img.setAttribute('aria-hidden','true');
     stage.appendChild(img);
-
     const controls=doc.createElement('div');
     controls.className='lji-approved-image-controls';
     controls.appendChild(card);
@@ -95,24 +88,19 @@
     html=html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v'+BUILD+' · © 2026');
     html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Approved Login Image · 11/09/2026 -->');
     const doc=new DOMParser().parseFromString(html,'text/html');
-
     const ownership=doc.createElement('script');
     ownership.textContent="window.LJI_LOGIN_LAYOUT_OWNER='approved-image-v31';";
     doc.head.insertBefore(ownership,doc.head.firstChild);
-
     const legacyNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','desktop-login-polish-v23.js'];
     doc.querySelectorAll('script[src]').forEach(s=>{const src=s.getAttribute('src')||'';if(legacyNeedles.some(n=>src.includes(n)))s.remove();});
     doc.querySelectorAll('link[href]').forEach(l=>{const h=l.getAttribute('href')||'';if(/desktop-layout-v23|desktop-login-polish-v23|desktop-login-approved-v30|mobile-v25/.test(h))l.remove();});
-
     appendCss(doc,'./dashboard-v24.css?v='+BUILD);
     appendCss(doc,'./capture-center-v29.css?v='+BUILD);
     appendCss(doc,'./gmail-system-v29.css?v='+BUILD);
     appendCss(doc,'./gmail-system-v29-5.css?v='+BUILD);
     appendCss(doc,'./responsive-consistency-v29-6.css?v='+BUILD);
     appendCss(doc,'./login-approved-image-v31.css?v='+BUILD);
-
     buildApprovedImageAuth(doc,bg);
-
     appendScript(doc,'./dashboard-v24.js?v='+BUILD);
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
     appendScript(doc,'./capture-collector-v29.js?v='+BUILD);
@@ -120,11 +108,9 @@
     appendScript(doc,'./gmail-system-v29.js?v='+BUILD);
     appendScript(doc,'./gmail-system-v29-5.js?v='+BUILD);
     appendScript(doc,'./responsive-consistency-v29-6.js?v='+BUILD);
-
     const behavior=doc.createElement('script');
     behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';}});";
     doc.body.appendChild(behavior);
-
     const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
     document.open();document.write(out);document.close();
   }catch(error){
