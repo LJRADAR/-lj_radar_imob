@@ -10,8 +10,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='30.0.2';
-  const BUST='20260911-approved-reference-single-login';
+  const BUILD='30.0.3';
+  const BUST='20260911-stop-legacy-login-reinjection';
   const logo='./lj-logo-compact.png?v='+BUILD;
 
   function prepareCard(doc,card){
@@ -117,6 +117,11 @@
 
     const doc=new DOMParser().parseFromString(html,'text/html');
 
+    /* Define a autoridade do login ANTES que qualquer script do app rode. */
+    const ownership=doc.createElement('script');
+    ownership.textContent="window.LJI_LOGIN_LAYOUT_OWNER='index-v30';";
+    doc.head.insertBefore(ownership,doc.head.firstChild);
+
     /* Remove o selo técnico legado da UI. */
     doc.querySelectorAll('body *').forEach(el=>{
       const text=(el.textContent||'').replace(/\s+/g,' ').trim();
@@ -134,13 +139,10 @@
     appendCss(doc,'./gmail-system-v29.css?v='+BUILD);
     appendCss(doc,'./gmail-system-v29-5.css?v='+BUILD);
     appendCss(doc,'./responsive-consistency-v29-6.css?v='+BUILD);
-    /* O CSS aprovado entra por último para ser a autoridade visual do login. */
     appendCss(doc,'./desktop-login-approved-v30.css?v='+BUILD);
 
     buildReferenceAuth(doc);
 
-    /* Desktop/mobile continuam ativos para o app, mas não podem reconstruir o login:
-       os flags v23Ready/mobileV25 acima bloqueiam os builders legados. */
     appendScript(doc,'./desktop-layout-v23.js?v='+BUILD);
     appendScript(doc,'./dashboard-v24.js?v='+BUILD);
     appendScript(doc,'./mobile-v25.js?v='+BUILD);
