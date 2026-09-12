@@ -1,208 +1,141 @@
 'use strict';
 
-/* LJ Radar Imob — Login polish v23
-   Ajusta apresentação e interação da tela de login desktop sem observador recursivo. */
+/* LJ Radar Imob — Approved Login v30
+   Reconstrói somente a apresentação do login com a identidade aprovada.
+   Preserva IDs, listeners e autenticação existentes. */
 (function(){
-  let audioCtx = null;
-  let lastPingAt = 0;
+  const STYLE_ID='lji-approved-login-v30-style';
+  const STYLE_HREF='./desktop-login-approved-v30.css?v=30.0.1';
+  const LOGO='./lj-logo-compact.png?v=30.0.1';
 
-  function getAudioCtx(){
-    try{
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if(!AudioCtx) return null;
-      audioCtx = audioCtx || new AudioCtx();
-      if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
-      return audioCtx;
-    }catch(_){ return null; }
+  function q(sel,root=document){return root.querySelector(sel)}
+
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID)) return;
+    const link=document.createElement('link');
+    link.id=STYLE_ID;
+    link.rel='stylesheet';
+    link.href=STYLE_HREF;
+    document.head.appendChild(link);
   }
 
-  function futuristicMetalPing(){
-    const nowMs = Date.now();
-    if(nowMs - lastPingAt < 420) return;
-    lastPingAt = nowMs;
-    const ctx = getAudioCtx();
-    if(!ctx) return;
-    try{
-      const now = ctx.currentTime;
-      const master = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1450, now);
-      filter.Q.setValueAtTime(2.1, now);
-      master.gain.setValueAtTime(0.0001, now);
-      master.gain.exponentialRampToValueAtTime(0.075, now + 0.012);
-      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.34);
-      filter.connect(master);
-      master.connect(ctx.destination);
+  function ensureControls(card){
+    const oldBrand=q('.auth-brand',card); if(oldBrand) oldBrand.hidden=true;
+    const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
 
-      [390, 760, 1260, 2010].forEach((hz, i)=>{
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = i % 2 === 0 ? 'triangle' : 'sine';
-        osc.frequency.setValueAtTime(hz, now);
-        osc.frequency.exponentialRampToValueAtTime(hz * (i < 2 ? 1.08 : 0.92), now + 0.26);
-        gain.gain.setValueAtTime(i === 0 ? 0.26 : 0.16, now + i * 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.30);
-        osc.connect(gain);
-        gain.connect(filter);
-        osc.start(now + i * 0.006);
-        osc.stop(now + 0.32);
-      });
-    }catch(_){ }
-  }
+    const forgot=q('#ljiForgotPassword',card);
+    if(forgot && !q('.lji-login-controls',card)){
+      const controls=document.createElement('div');
+      controls.className='lji-login-controls';
+      controls.innerHTML='<label class="lji-remember"><input id="ljiRememberAccess" type="checkbox" checked><span></span><b>Lembrar acesso</b></label>';
+      forgot.parentNode.insertBefore(controls,forgot);
+      controls.appendChild(forgot);
+    }
 
-  function unlockAudio(){ getAudioCtx(); }
-  document.addEventListener('pointerdown', unlockAudio, {once:true, passive:true});
-  document.addEventListener('keydown', unlockAudio, {once:true});
-
-  function pointInside(rect,x,y){
-    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-  }
-
-  function clearInputBlocker(input){
-    if(!input || typeof document.elementFromPoint !== 'function') return;
-    const rect = input.getBoundingClientRect();
-    if(!rect.width || !rect.height) return;
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    for(let i=0;i<5;i++){
-      const top = document.elementFromPoint(x,y);
-      if(!top || top === input || input.contains(top)) return;
-      if(top.contains(input)) return;
-      const overlay = document.querySelector('#ljiAuthOverlay');
-      if(!overlay || !overlay.contains(top)) return;
-      if(top.matches('input,button,a,label,.auth-field,.password-input-wrap,.auth-card,.lji-login-left-inner,.lji-login-left,.lji-login-shell')) return;
-      top.style.pointerEvents = 'none';
-      top.dataset.ljiPointerBlockerDisabled = '1';
+    const login=q('#ljiAuthLogin',card);
+    if(login && !q('.lji-login-divider',card)){
+      const divider=document.createElement('div');
+      divider.className='lji-login-divider';
+      divider.innerHTML='<span></span><b>ou</b><span></span>';
+      login.insertAdjacentElement('afterend',divider);
+      const req=document.createElement('button');
+      req.type='button';
+      req.className='lji-request-access';
+      req.setAttribute('data-lji-request-access','1');
+      req.textContent='Solicitar acesso';
+      divider.insertAdjacentElement('afterend',req);
     }
   }
 
-  function ensureLoginInteractive(){
-    const overlay = document.querySelector('#ljiAuthOverlay');
-    if(!overlay || overlay.classList.contains('hidden')) return;
-    const card = overlay.querySelector('.auth-card');
-    const email = overlay.querySelector('#ljiAuthEmail');
-    const pass = overlay.querySelector('#ljiAuthPassword');
-    const login = overlay.querySelector('#ljiAuthLogin');
-    const forgot = overlay.querySelector('#ljiForgotPassword');
-    if(!card || !email || !pass || !login) return;
+  function ensureCardBrand(card){
+    q('.lji-approved-card-brand',card)?.remove();
+    const brand=document.createElement('div');
+    brand.className='lji-approved-card-brand';
+    brand.innerHTML='<img src="'+LOGO+'" alt="LJ Radar Imob"><h2>Acesse sua conta</h2>';
+    const firstField=q('.auth-field',card);
+    if(firstField) card.insertBefore(brand,firstField); else card.prepend(brand);
 
-    [overlay, card, email, pass, login, forgot].filter(Boolean).forEach(el=>{
-      el.removeAttribute('inert');
-      el.style.pointerEvents = 'auto';
-    });
-    [email,pass].forEach(input=>{
-      input.disabled = false;
-      input.readOnly = false;
+    const info=q('.auth-info',card);
+    if(info){
+      if(!info.textContent.trim() || /administrador|suporte/i.test(info.textContent)) info.textContent='Acesso restrito aos usuários autorizados.';
+      info.style.display='block';
+    }
+  }
+
+  function ensureInteractive(overlay){
+    const card=q('.auth-card',overlay);
+    const email=q('#ljiAuthEmail',overlay);
+    const pass=q('#ljiAuthPassword',overlay);
+    const login=q('#ljiAuthLogin',overlay);
+    [overlay,card,email,pass,login].filter(Boolean).forEach(el=>{el.removeAttribute('inert');el.style.pointerEvents='auto'});
+    [email,pass].filter(Boolean).forEach(input=>{
+      input.disabled=false;
+      input.readOnly=false;
       input.removeAttribute('aria-disabled');
-      input.removeAttribute('tabindex');
-      input.style.userSelect = 'text';
-      input.style.webkitUserSelect = 'text';
-      input.style.cursor = 'text';
-      clearInputBlocker(input);
+      input.style.userSelect='text';
+      input.style.webkitUserSelect='text';
     });
-    if(login.textContent.trim() === 'Entrar') login.disabled = false;
-
-    if(overlay.dataset.ljiInteractionBridge !== '1'){
-      overlay.dataset.ljiInteractionBridge = '1';
-      overlay.addEventListener('pointerdown', function(e){
-        for(const input of [email,pass]){
-          const r = input.getBoundingClientRect();
-          if(pointInside(r,e.clientX,e.clientY) && e.target !== input){
-            e.preventDefault();
-            e.stopPropagation();
-            input.focus({preventScroll:true});
-            return;
-          }
-        }
-        const rLogin = login.getBoundingClientRect();
-        if(pointInside(rLogin,e.clientX,e.clientY) && e.target !== login){
-          e.preventDefault();
-          e.stopPropagation();
-          login.click();
-          return;
-        }
-        if(forgot){
-          const rForgot = forgot.getBoundingClientRect();
-          if(pointInside(rForgot,e.clientX,e.clientY) && e.target !== forgot){
-            e.preventDefault();
-            e.stopPropagation();
-            forgot.click();
-          }
-        }
-      }, true);
-    }
   }
 
-  function polish(){
-    const lang = document.querySelector('.lji-login-lang');
-    if(lang){
-      const spans = lang.querySelectorAll('span');
-      if(spans[0]){
-        if(spans[0].textContent !== 'Brasil') spans[0].textContent = 'Brasil';
-        spans[0].title = 'Mercado atual: Brasil';
-      }
-      if(spans[1]){
-        if(spans[1].textContent !== 'PT-BR') spans[1].textContent = 'PT-BR';
-        spans[1].title = 'Idioma atual: Português (Brasil)';
-      }
-    }
+  function build(){
+    ensureStyle();
+    const overlay=q('#ljiAuthOverlay');
+    if(!overlay) return;
+    const card=q('.auth-card',overlay);
+    if(!card) return;
 
-    const brand = document.querySelector('.lji-login-brand');
-    if(brand){
-      const h1 = brand.querySelector('h1');
-      if(h1) h1.remove();
-    }
+    ensureControls(card);
+    ensureCardBrand(card);
 
-    const cardMeta = [
-      {price:'R$ 1.200.000', cls:'apt'},
-      {price:'R$ 890.000', cls:'house'},
-      {price:'R$ 450.000', cls:'land'}
-    ];
+    const shell=document.createElement('div');
+    shell.className='lji-approved-shell';
 
-    document.querySelectorAll('.lji-login-float').forEach((card, index)=>{
-      const meta = cardMeta[index] || cardMeta[0];
-      if(!card.querySelector('.lji-float-thumb')){
-        const strong = card.querySelector('strong');
-        const text = Array.from(card.children).find(el=>el.tagName === 'SPAN');
-        if(!strong || !text) return;
+    const hero=document.createElement('section');
+    hero.className='lji-approved-hero';
+    hero.innerHTML=`
+      <div class="lji-approved-brand">
+        <img src="${LOGO}" alt="LJ Radar Imob">
+        <p>Inteligência imobiliária para captação e oportunidades</p>
+      </div>
+      <div class="lji-approved-copy">
+        <small>ANÁLISE · DADOS · OPERAÇÃO</small>
+        <h1>Dados transformam<br>o mercado em<strong>oportunidades.</strong></h1>
+        <p>Encontre imóveis, identifique proprietários, antecipe movimentos e aumente seus resultados com inteligência e tecnologia.</p>
+      </div>
+      <div class="lji-approved-features">
+        <div class="lji-approved-feature"><i>▥</i><span><b>Mais Leads</b><em>dados reais e qualificados</em></span></div>
+        <div class="lji-approved-feature"><i>↯</i><span><b>Mais Oportunidades</b><em>intenção antes do mercado</em></span></div>
+        <div class="lji-approved-feature"><i>◎</i><span><b>Mais Resultados</b><em>decisão com inteligência</em></span></div>
+      </div>
+      <div class="lji-approved-hero-footer">LJ RADAR IMOB &nbsp; · &nbsp; Inteligência em cada movimento.</div>`;
 
-        const thumb = document.createElement('span');
-        thumb.className = `lji-float-thumb lji-thumb-${meta.cls}`;
-        thumb.setAttribute('aria-hidden','true');
-        thumb.title = 'Imagem ilustrativa da oportunidade';
+    const side=document.createElement('section');
+    side.className='lji-approved-login-side';
+    side.innerHTML='<div class="lji-approved-locale"><b>Brasil</b><i></i><b>PT-BR</b></div><div class="lji-approved-cardwrap"></div><div class="lji-approved-side-footer">ANÁLISE · DADOS · OPERAÇÃO</div>';
+    const wrap=q('.lji-approved-cardwrap',side);
+    wrap.appendChild(card);
 
-        const copy = document.createElement('span');
-        copy.className = 'lji-float-copy';
-        const price = document.createElement('b');
-        price.className = 'lji-float-price';
-        price.textContent = meta.price;
-        const arrow = document.createElement('i');
-        arrow.className = 'lji-float-arrow';
-        arrow.textContent = '›';
-        copy.append(strong, price, text);
-        card.replaceChildren(thumb, copy, arrow);
-        card.setAttribute('data-visual-card', String(index + 1));
-      }
-
-      if(card.dataset.soundBound !== '1'){
-        card.dataset.soundBound = '1';
-        card.addEventListener('pointerenter', futuristicMetalPing);
-        card.addEventListener('pointerdown', futuristicMetalPing);
-      }
+    const support=document.createElement('button');
+    support.type='button';
+    support.className='lji-approved-support';
+    support.textContent='Falar com suporte';
+    support.addEventListener('click',()=>{
+      const info=q('.auth-info',card);
+      if(info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block'}
     });
+    wrap.appendChild(support);
 
-    const radar = document.querySelector('.lji-login-hero-radar');
-    if(radar && radar.dataset.polishSoundBound !== '1'){
-      radar.dataset.polishSoundBound = '1';
-      radar.addEventListener('pointerenter', futuristicMetalPing);
-    }
-
-    ensureLoginInteractive();
+    shell.append(hero,side);
+    overlay.className='auth-overlay lji-approved-v30';
+    overlay.dataset.approvedStatic='v30-approved-blue';
+    overlay.replaceChildren(shell);
+    ensureInteractive(overlay);
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', polish, {once:true});
-  else polish();
-  window.addEventListener('load', polish, {once:true});
-  [80,250,700,1500].forEach(ms=>setTimeout(polish,ms));
+  function apply(){try{build()}catch(err){console.error('LJ approved login v30',err)}}
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true});
+  else apply();
+  window.addEventListener('load',apply,{once:true});
+  [100,350,900,1800].forEach(ms=>setTimeout(apply,ms));
 })();
