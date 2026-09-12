@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -37,6 +37,10 @@ async function resolveWorkspacePhoneId(admin: any, workspace: string) {
   }
 
   const legacy = clean(Deno.env.get("META_WHATSAPP_PHONE_NUMBER_ID"));
+  const legacyWorkspace = clean(Deno.env.get("LJI_WORKSPACE_ID"));
+  if (legacy && legacyWorkspace && legacyWorkspace !== workspace) {
+    return { phoneId: "", accountId: null, source: "legacy_workspace_mismatch" };
+  }
   return {
     phoneId: legacy,
     accountId: null,
@@ -97,13 +101,16 @@ Deno.serve(async (req) => {
     const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: member, error: memberError } = await admin
       .from("lji_workspace_members")
-      .select("role,is_active")
+      .select("role,is_active,permissions")
       .eq("workspace_id", workspace)
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle();
     if (memberError) return json({ ok: false, error: "workspace_lookup_failed", version: VERSION }, 500);
     if (!member) return json({ ok: false, error: "workspace_forbidden", version: VERSION }, 403);
+    const modules = Array.isArray(member.permissions?.modules) ? member.permissions.modules.map((x: unknown) => String(x)) : [];
+    const canSend = member.role === "super_admin" || modules.includes("whatsapp-leads") || (member.role === "gestor" && modules.length === 0);
+    if (!canSend) return json({ ok: false, error: "sem_permissao_whatsapp", version: VERSION }, 403);
 
     const linked = await validateLinkedEntity(admin, workspace, entityType, entityId);
     if (!linked.ok) return json({ ok: false, error: linked.error, version: VERSION }, 403);
@@ -117,11 +124,19 @@ Deno.serve(async (req) => {
       return json({ ok: false, error, workspace_resolution: account.source, version: VERSION }, 503);
     }
 
-    const r = await fetch(`https://graph.facebook.com/${graph}/${encodeURIComponent(account.phoneId)}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: text, preview_url: false } }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let r: Response;
+    try {
+      r = await fetch(`https://graph.facebook.com/${graph}/${encodeURIComponent(account.phoneId)}/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: text, preview_url: false } }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const out = await r.json().catch(() => ({}));
     const messageId = out?.messages?.[0]?.id || null;
     const accountAudit = {

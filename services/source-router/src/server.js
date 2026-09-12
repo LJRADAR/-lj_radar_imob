@@ -4,9 +4,9 @@ import { config } from './config.js';
 import { routeCollection, validateRequest } from './router.js';
 import { collectApifyTask } from './adapters/apify.js';
 import { verifyQuinto } from './adapters/quinto.js';
+import { readRawBody } from './request-body.js';
 
-const VERSION = '1.6.2';
-const MAX_BODY_BYTES = 128000;
+const VERSION = '1.7.0';
 const MAX_SKEW_MS = 120000;
 const seenNonces = new Map();
 
@@ -18,15 +18,6 @@ function send(res, status, payload) {
     'Cache-Control': 'no-store',
   });
   res.end(body);
-}
-
-async function readRawBody(req) {
-  let raw = '';
-  for await (const chunk of req) {
-    raw += chunk;
-    if (Buffer.byteLength(raw) > MAX_BODY_BYTES) throw new Error('request_too_large');
-  }
-  return raw;
 }
 
 function pruneNonces(now) {
@@ -254,7 +245,7 @@ const server = http.createServer(async (req, res) => {
 
     let body;
     try {
-      body = rawBody ? JSON.parse(rawBody) : {};
+      body = rawBody.length ? JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(rawBody)) : {};
     } catch {
       console.warn(`invalid json ${url.pathname}`);
       return send(res, 400, { ok: false, error: 'invalid_json', version: VERSION });
@@ -298,7 +289,8 @@ const server = http.createServer(async (req, res) => {
     return send(res, status, { ...result, router_version: VERSION });
   } catch (error) {
     console.error('request failed', error instanceof Error ? error.message : String(error));
-    return send(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error), version: VERSION });
+    const tooLarge = error?.message === 'request_too_large';
+    return send(res, tooLarge ? 413 : 500, { ok: false, error: tooLarge ? 'request_too_large' : 'internal_error', version: VERSION });
   }
 });
 

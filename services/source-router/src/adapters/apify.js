@@ -1,4 +1,4 @@
-import { locationMatchesTarget } from '../normalize.js';
+import { locationMatchStatus } from '../normalize.js';
 
 const API = 'https://api.apify.com/v2';
 
@@ -26,6 +26,7 @@ const FACEBOOK_GROUP_URLS = [
 ];
 
 function text(value) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
   const v = String(value ?? '').trim();
   return v || null;
 }
@@ -42,6 +43,7 @@ function normalizeText(value) {
 export function parseMoney(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (/\d\s*(?:a|até|ate|[-–])\s*\d/i.test(String(value))) return null;
   let raw = String(value).trim().replace(/[^0-9,.-]/g, '');
   if (!raw) return null;
 
@@ -84,6 +86,43 @@ export function parseMoney(value) {
 
   const n = Number(`${negative ? '-' : ''}${normalized}`);
   return Number.isFinite(n) ? n : null;
+}
+
+export function parseCount(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).trim();
+  if (!/^\d{1,3}(?:\s*(?:quartos?|dormit[oó]rios?|banheiros?|vagas?|beds?|baths?))?$/i.test(raw)) return null;
+  const count = Number(raw.match(/^\d+/)[0]);
+  return count <= 100 ? count : null;
+}
+
+const STATE_NAMES = ['Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal','Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul','Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí','Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia','Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins'];
+const STATE_CODES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+export function normalizeStateCode(value) {
+  const raw = text(value);
+  if (!raw) return null;
+  if (STATE_CODES.includes(raw.toUpperCase())) return raw.toUpperCase();
+  const index = STATE_NAMES.findIndex(name => normalizeText(name) === normalizeText(raw));
+  return index < 0 ? null : STATE_CODES[index];
+}
+
+function safeImage(value) {
+  const raw = text(value) || text(value?.url) || text(value?.uri) || text(value?.src);
+  try { const u = new URL(raw); return ['http:', 'https:'].includes(u.protocol) && !u.username && !u.password ? u.href : null; }
+  catch { return null; }
+}
+
+function validPhone(value, allowLocal = false) {
+  const raw = text(value);
+  if (!raw || !/^[+\d\s().-]+$/.test(raw)) return null;
+  let digits = raw.replace(/\D/g, '');
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) digits = digits.slice(2);
+  if (/^(\d)\1+$/.test(digits)) return null;
+  if (digits.length === 10 || digits.length === 11) {
+    if (!/^[1-9][1-9]/.test(digits)) return null;
+    return (digits.length === 11 ? /^9\d{8}$/ : /^[2-5]\d{7}$/).test(digits.slice(2)) ? raw : null;
+  }
+  return allowLocal && /^(?:9\d{8}|[2-5]\d{7})$/.test(digits) ? raw : null;
 }
 
 function textBlob(title, description) {
@@ -171,8 +210,15 @@ function priceFromText(title, description, transactionType) {
 
 function contactPhoneFromText(title, description) {
   const raw = `${title || ''} ${description || ''}`;
-  const match = raw.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9?\d{4}[-\s]?\d{4}|9\d{4}[-\s]?\d{2}[-\s]?\d{2})/);
-  return match ? match[0].trim() : null;
+  const candidates = raw.matchAll(/(?<!\d)(?:\+?55[\s.-]*)?(?:\(?\d{2}\)?[\s.-]*)?(?:9\d{4}[-\s]?\d{2}[-\s]?\d{2}|[2-5]\d{3}[-\s]?\d{4})(?!\d)/g);
+  for (const match of candidates) {
+    const before = raw.slice(Math.max(0, match.index - 45), match.index);
+    if (/(?:R\$|valor|pre[cç]o|CEP|c[oó]digo)\s*[:=.-]?\s*$/i.test(before)) continue;
+    const labeled = /(?:whats(?:app)?|zap|wpp|telefone|fone|contato|informa[cç][oõ]es|interessados)\D{0,28}$/i.test(before);
+    const phone = validPhone(match[0], labeled);
+    if (phone) return phone;
+  }
+  return null;
 }
 
 function whatsappFromText(title, description) {
@@ -219,13 +265,13 @@ function normalizePropertyType(value) {
   return text(value);
 }
 
-function propertyMetric(properties, labels) {
+function propertyMetric(properties, labels, parser = parseMoney) {
   if (!Array.isArray(properties)) return null;
   const wanted = labels.map(normalizeText);
   for (const entry of properties) {
     const name = normalizeText(entry?.name ?? entry?.label ?? entry?.key);
     if (!name || !wanted.some((label) => name === label || name.includes(label))) continue;
-    const value = parseMoney(entry?.value ?? entry?.values?.[0]);
+    const value = parser(entry?.value ?? entry?.values?.[0]);
     if (value !== null) return value;
   }
   return null;
@@ -285,9 +331,10 @@ export function normalizeApifyItem(item, request, source) {
   const rawLocation = text(first(item, ['location', 'locationName', 'placeName']));
   const facebookLocation = source === 'facebook' ? parseFacebookLocation(rawLocation) : { city: null, state_code: null };
   const directCity = text(first(item, ['city', 'locationCity', 'municipality']));
-  const actualCity = directCity || facebookLocation.city || (source === 'facebook' ? inferCoreCityFromText(title, description) : null);
+  const actualCity = text(directCity || facebookLocation.city || (source === 'facebook' ? inferCoreCityFromText(title, description) : null))?.normalize('NFC') || null;
   const neighborhood = text(first(item, ['neighborhood', 'neighbourhood', 'bairro', 'district']));
-  if (source === 'olx' && (!actualCity || !locationMatchesTarget(request.city, actualCity, neighborhood || ''))) return null;
+  const geoStatus = locationMatchStatus(request.city, actualCity, neighborhood || '');
+  if (source === 'olx' && (!actualCity || geoStatus === 'outside')) return null;
   const city = actualCity || (source === 'olx' ? request.city : null);
   const publishedAt = text(first(item, ['published_at', 'publishedAt', 'postedAt', 'timestamp', 'time', 'date', 'createdAt', 'takenAtIso']));
   const seller = text(nested(item, ['seller.name', 'seller.username', 'owner.username', 'owner.fullName', 'user.name']))
@@ -312,20 +359,20 @@ export function normalizeApifyItem(item, request, source) {
 
   const areaM2 = parseMoney(first(item, ['area_m2', 'areaM2', 'area', 'floorSize']))
     ?? propertyMetric(properties, ['Área útil', 'Area util', 'Área', 'Area', 'Metragem']);
-  const bedrooms = parseMoney(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
-    ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios'])
+  const bedrooms = parseCount(first(item, ['bedrooms', 'bedroomCount', 'rooms']))
+    ?? propertyMetric(properties, ['Quartos', 'Dormitórios', 'Dormitorios'], parseCount)
     ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:dorm(?:it[oó]rios?)?|quartos?|beds?)\b/i]);
-  const bathrooms = parseMoney(first(item, ['bathrooms', 'bathroomCount']))
-    ?? propertyMetric(properties, ['Banheiros', 'Banheiro'])
+  const bathrooms = parseCount(first(item, ['bathrooms', 'bathroomCount']))
+    ?? propertyMetric(properties, ['Banheiros', 'Banheiro'], parseCount)
     ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:banheiros?|baths?)\b/i]);
-  const parkingSpaces = parseMoney(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
-    ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem'])
+  const parkingSpaces = parseCount(first(item, ['parking_spaces', 'parkingSpaces', 'parking']))
+    ?? propertyMetric(properties, ['Vagas na garagem', 'Vagas de garagem', 'Vagas', 'Garagem'], parseCount)
     ?? metricFromText(title, inferenceDescription, [/(\d+)\s*(?:vagas?|garagens?)\b/i]);
   const providerPrice = parseMoney(first(item, ['price', 'amount', 'value']));
-  const price = source === 'facebook' && (providerPrice === null || providerPrice <= 0)
+  const price = providerPrice === null || providerPrice <= 0
     ? priceFromText(title, inferenceDescription, transactionType)
     : providerPrice ?? priceFromText(title, inferenceDescription, transactionType);
-  const phone = text(first(item, ['phone', 'telephone', 'contactPhone'])) || contactPhoneFromText(title, inferenceDescription);
+  const phone = validPhone(first(item, ['phone', 'telephone', 'contactPhone']), true) || contactPhoneFromText(title, inferenceDescription);
   const whatsapp = text(first(item, ['whatsapp', 'whatsappUrl'])) || whatsappFromText(title, inferenceDescription);
   const attachmentImage = attachments
     .map((entry) => text(entry?.thumbnail) || text(entry?.photo_image?.uri) || text(entry?.image?.uri))
@@ -340,7 +387,7 @@ export function normalizeApifyItem(item, request, source) {
     description,
     price,
     currency: text(first(item, ['currency', 'currency_id'])) || 'BRL',
-    state_code: text(first(item, ['state', 'state_code', 'stateCode'])) || facebookLocation.state_code || 'SP',
+    state_code: normalizeStateCode(first(item, ['state_code', 'stateCode', 'state'])) || facebookLocation.state_code || null,
     city,
     neighborhood,
     transaction_type: transactionType,
@@ -354,7 +401,7 @@ export function normalizeApifyItem(item, request, source) {
     bathrooms: bathrooms !== null ? Math.max(0, Math.trunc(bathrooms)) : null,
     parking_spaces: parkingSpaces !== null ? Math.max(0, Math.trunc(parkingSpaces)) : null,
     postal_code: text(first(item, ['zipcode', 'postalCode', 'cep'])),
-    main_image_url: text(first(item, ['thumbnailUrl', 'imageUrl', 'mainImageUrl'])) || text(images[0]) || attachmentImage,
+    main_image_url: safeImage(first(item, ['thumbnailUrl', 'imageUrl', 'mainImageUrl'])) || images.map(safeImage).find(Boolean) || safeImage(attachmentImage),
     attributes: {
       phone,
       whatsapp,
@@ -375,7 +422,8 @@ export function normalizeApifyItem(item, request, source) {
     raw_quality: {
       apify: true,
       official_api: false,
-      exact_city_or_zone: source === 'olx',
+      exact_city_or_zone: source === 'olx' && geoStatus === 'exact',
+      zone_verification: source === 'olx' ? geoStatus : 'not_applicable',
       task_normalized: true,
       source_profile: source === 'olx'
         ? 'solidcode/olx-brazil-scraper'

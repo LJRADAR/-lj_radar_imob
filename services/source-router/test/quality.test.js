@@ -28,6 +28,7 @@ test('professional seller types and names are rejected', () => {
   assert.equal(isObviousProfessionalAdvertiser({ seller_nickname: 'ABC Imóveis' }), true);
   assert.equal(isObviousProfessionalAdvertiser({ seller_nickname: 'João', description: 'CRECI 12345-F' }), true);
   assert.equal(isObviousProfessionalAdvertiser({ seller_nickname: 'Maria', description: 'Vendo meu apartamento direto.' }), false);
+  assert.equal(isObviousProfessionalAdvertiser({ seller_nickname: 'Maria', description: 'Vendo direto, sem corretor ou imobiliária.' }), false);
 });
 
 test('professional advertiser diagnostics identify the first decisive signal', () => {

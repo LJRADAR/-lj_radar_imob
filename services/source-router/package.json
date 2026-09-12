@@ -5,7 +5,6 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "prestart": "npm test",
     "start": "node src/server.js",
     "test": "node --test",
     "apify:bootstrap": "node scripts/bootstrap-apify.mjs"

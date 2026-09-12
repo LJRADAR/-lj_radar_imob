@@ -20,7 +20,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const FUNCTION_NAME = "lji-manual-capture-v1";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const SALE_COMMISSION_RATE = 0.0125;
 const PAGE_TIMEOUT_MS = 12000;
@@ -133,10 +133,18 @@ function isBlockedIpv6(ip: string): boolean {
   return Boolean(mapped && isBlockedIpv4(mapped[1]));
 }
 
+function ipv6MappedHexIsPrivate(ip: string): boolean {
+  const n = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  const m = n.match(/::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!m) return false;
+  const hi = parseInt(m[1], 16), lo = parseInt(m[2], 16);
+  return isBlockedIpv4([(hi >> 8) & 255, hi & 255, (lo >> 8) & 255, lo & 255].join("."));
+}
+
 function hostLooksPrivate(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (!h || h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
-  if (isBlockedIpv4(h) || (h.includes(":") && isBlockedIpv6(h))) return true;
+  if (isBlockedIpv4(h) || (h.includes(":") && (isBlockedIpv6(h) || ipv6MappedHexIsPrivate(h)))) return true;
   return false;
 }
 
@@ -248,6 +256,10 @@ async function fetchPageText(url: string): Promise<{ ok: boolean; text: string; 
     if (ct && !ct.includes("text/html") && !ct.includes("application/xhtml+xml")) {
       return { ok: false, text: "", status: 415, security: "content_type_rejected" };
     }
+    const contentLength = Number(r.headers.get("content-length") || 0);
+    if (Number.isFinite(contentLength) && contentLength > 1_500_000) {
+      return { ok: false, text: "", status: 413, security: "response_too_large" };
+    }
     const html = (await r.text()).slice(0, 1_000_000);
     const clean = html
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -326,11 +338,18 @@ function whatsappLink(phoneNormalized: string | null): string | null {
 
 async function callFn(fn: string, payload: unknown): Promise<Json> {
   const key = namedSecret();
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
-    method: "POST",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let r: Response;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload), signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const data = (await r.json().catch(() => ({}))) as Json;
   if (!r.ok) throw new Error(`${fn} HTTP ${r.status}: ${txt(data.error) ?? JSON.stringify(data).slice(0, 200)}`);
   return data;
@@ -406,8 +425,19 @@ Deno.serve(async (req) => {
     }, 400);
   }
 
-  const { data: dup } = await admin.from("lj_v2_raw_discoveries").select("id,metadata").eq("normalized_url", url).limit(1);
-  const existingId = dup?.[0]?.id as string | undefined;
+  const { data: duplicateRows, error: duplicateError } = await admin
+    .from("lj_v2_raw_discoveries")
+    .select("id,metadata,raw_payload")
+    .eq("normalized_url", url)
+    .limit(20);
+  if (duplicateError) return reply({ ok: false, error: "falha_ao_consultar_link" }, 500);
+  const ownsDiscovery = (row: any) => {
+    const m = row?.metadata || {};
+    return String(m.workspace_id || m.search_context?.workspace_id || row?.raw_payload?.workspace_id || "") === workspaceId;
+  };
+  const duplicate = (duplicateRows || []).find(ownsDiscovery);
+  const conflictingDuplicate = (duplicateRows || []).some((row: any) => !ownsDiscovery(row));
+  const existingId = duplicate?.id as string | undefined;
 
   const page = await fetchPageText(url);
   if (!page.ok && !existingId) {
@@ -486,10 +516,11 @@ Deno.serve(async (req) => {
   };
 
   if (discoveryId) {
-    await admin.from("lj_v2_raw_discoveries").update({
+    const updated = await admin.from("lj_v2_raw_discoveries").update({
       detected_city: city, detected_transaction: tx, detected_property_type: propertyType,
       last_seen_at: new Date().toISOString(), discovery_status: "raw", metadata: meta,
     }).eq("id", discoveryId);
+    if (updated.error) return reply({ ok: false, error: "falha_ao_atualizar_captura" }, 500);
   } else {
     const ins = await admin.from("lj_v2_raw_discoveries").insert({
       source_id: sourceId, original_url: url, normalized_url: url, url_hash: await sha256(url),
@@ -499,6 +530,9 @@ Deno.serve(async (req) => {
       raw_payload: { source: "manual_paste", url, workspace_id: workspaceId },
     }).select("id").single();
     if (ins.error || !ins.data?.id) {
+      if (String(ins.error?.code || "") === "23505" || conflictingDuplicate) {
+        return reply({ ok: false, error: "link_ja_registrado_em_outro_workspace", message: "Este link já está associado a outro workspace." }, 409);
+      }
       return reply({ ok: false, error: "falha_ao_registrar", details: ins.error?.message }, 500);
     }
     discoveryId = ins.data.id;

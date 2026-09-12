@@ -1,6 +1,7 @@
 import { collectThreads } from './adapters/threads.js';
 import { collectApifyTask } from './adapters/apify.js';
 import { canonicalSourceKey, filterQualifiedRows } from './quality.js';
+import { normalizeText } from './normalize.js';
 
 const CORE_TARGETS = new Set([
   'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema',
@@ -14,11 +15,12 @@ export function validateRequest(body) {
   const request = {
     source: String(body?.source || 'all').trim().toLowerCase(),
     state_code: String(body?.state_code || '').trim().toUpperCase(),
-    city: String(body?.city || '').trim(),
+    city: String(body?.city || '').normalize('NFC').trim(),
     transaction_type: body?.transaction_type === 'rent' ? 'rent' : body?.transaction_type === 'sale' ? 'sale' : null,
     property_type_code: body?.property_type_code ? String(body.property_type_code).trim() : null,
-    limit: Math.max(1, Math.min(200, Number(body?.limit || 30))),
+    limit: Number.isFinite(Number(body?.limit)) && Number(body?.limit) > 0 ? Math.max(1, Math.min(200, Math.trunc(Number(body.limit)))) : 30,
   };
+  request.city = [...CORE_TARGETS].find(city => normalizeText(city) === normalizeText(request.city)) || request.city;
   if (request.state_code !== 'SP') return { ok: false, error: 'state_not_supported' };
   if (!CORE_TARGETS.has(request.city)) return { ok: false, error: 'city_not_in_core_operation' };
   if (!request.transaction_type) return { ok: false, error: 'invalid_transaction_type' };
@@ -103,6 +105,7 @@ export async function routeCollection(request, config) {
       qualified_count: quality.accepted.length,
       quality_rejected_count: quality.rejected_count,
       quality_rejection_reasons: quality.rejection_reasons,
+      quality_rejected_samples: quality.rejected_samples,
       error: result?.error || null,
       cost_guard: result?.cost_guard || null,
     });
@@ -141,6 +144,9 @@ export async function routeCollection(request, config) {
     source: request.source,
     raw_count: rawCount,
     qualified_count: uniqueResults.length,
+    accepted_before_dedup_count: results.length,
+    duplicate_count: results.length - dedup.size,
+    limited_count: Math.max(0, dedup.size - uniqueResults.length),
     results: uniqueResults,
     source_report: sourceReport,
     error: successfulSources > 0 ? null : (failedErrors.join('; ') || 'collection_failed'),

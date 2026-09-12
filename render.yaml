@@ -3,7 +3,7 @@ services:
     name: lji-source-router
     runtime: node
     rootDir: services/source-router
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --omit=dev && npm test
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
@@ -35,4 +35,4 @@ services:
       - key: APIFY_TIMEOUT_SECS
         value: "40"
       - key: SOURCE_REQUEST_TIMEOUT_MS
-        value: "40000"
+        value: "50000"
