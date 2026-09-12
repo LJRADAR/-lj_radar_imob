@@ -656,6 +656,7 @@
     <input id="deepSearchInput" placeholder="Filtrar por imóvel, cidade, fonte ou contato..." oninput="renderDeepSearch()">
     <select id="deepSourceFilter" onchange="renderDeepSearch()"><option value="">Todas as fontes</option></select>
     <select id="deepCityFilter" onchange="renderDeepSearch()"><option value="">Todas as cidades</option></select>
+    <input id="deepNeighborhoodFilter" placeholder="Bairro" oninput="renderDeepSearch()">
     <select id="deepOwnerFilter" onchange="renderDeepSearch()"><option value="">Todos</option><option value="direct">Proprietário direto</option></select>
     <select id="deepContactFilter" onchange="renderDeepSearch()"><option value="">Todos os contatos</option><option value="whatsapp">Com WhatsApp</option><option value="phone">Com telefone</option><option value="hidden">Sem número público</option></select>
   </div>
@@ -667,7 +668,7 @@
 
 <section id="owners" class="page hidden">
   <div class="top"><div class="title"><h1>Radar Proprietários</h1><p>Histórico permanente de imóveis residenciais elegíveis. Mais recentes primeiro.</p></div><div class="top-actions export-actions"><button class="secondary" onclick="exportOwnersExcel()">Excel</button><button class="secondary" onclick="exportOwnersPdf()">PDF</button><button class="primary" onclick="go('imports')">Importar Excel</button></div></div>
-  <div class="toolbar owners-toolbar"><input id="ownerSearch" placeholder="Buscar imóvel, cidade ou origem..." oninput="renderOwners()"><select id="ownerHistoryFilter" onchange="renderOwners()"><option value="">Todo o histórico</option><option value="current">Somente atuais</option><option value="archived">Somente históricos</option></select><select id="ownerCity" onchange="renderOwners()"><option value="">Todas as regiões</option></select></div>
+  <div class="toolbar owners-toolbar"><input id="ownerSearch" placeholder="Buscar imóvel, cidade ou origem..." oninput="renderOwners()"><select id="ownerHistoryFilter" onchange="renderOwners()"><option value="">Todo o histórico</option><option value="current">Somente atuais</option><option value="archived">Somente históricos</option></select><select id="ownerCity" onchange="renderOwners()"><option value="">Todas as regiões</option></select><input id="ownerNeighborhood" placeholder="Bairro" oninput="renderOwners()"></div>
   <div class="card"><div id="ownersTable"></div></div>
 </section>
 
@@ -876,7 +877,7 @@
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="primary" onclick="addBuyer()">Salvar e cruzar</button></div>
   </div>
-  <div class="card" style="margin-top:18px"><div id="buyersTable"></div></div>
+  <div class="card" style="margin-top:18px"><div class="toolbar buyers-toolbar"><input id="buyerSearch" placeholder="Buscar comprador, cidade ou bairro..." oninput="renderBuyers()"><select id="buyerCityFilter" onchange="renderBuyers()"><option value="">Todas as regiões</option></select><input id="buyerNeighborhoodFilter" placeholder="Bairro" oninput="renderBuyers()"></div><div id="buyersTable"></div></div>
 </section>
 
 
@@ -1141,7 +1142,7 @@
 <section id="reports" class="page hidden">
   <div class="top">
     <div class="title"><h1>Relatórios</h1><p>Conversão, VGV, origem, produtividade e potencial comercial.</p></div>
-    <div style="display:flex;gap:10px"><button class="secondary" onclick="exportReportCSV()">Exportar CSV</button><button class="primary" onclick="window.print()">Imprimir / PDF</button></div>
+    <div class="top-actions export-actions"><select id="reportDaysFilter" onchange="renderReports()" aria-label="Período do relatório"><option value="3">Últimos 3 dias</option><option value="7">Últimos 7 dias</option><option value="30" selected>Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365">Último ano</option></select><button class="secondary" onclick="exportReportCSV()">Exportar CSV</button><button class="secondary" onclick="exportAllOperationalLeadsExcel()">Excel consolidado</button><button class="primary" onclick="window.print()">Imprimir / PDF</button></div>
   </div>
 
   <div class="grid4">
@@ -1371,4 +1372,3 @@
   <script src="./app-auth.js?v=22.50.4"></script>
 </body>
 </html>
-
