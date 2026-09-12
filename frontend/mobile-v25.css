@@ -131,7 +131,7 @@
   body.lji-mobile-v25 main>section:not(#dashboard)>.top,body.lji-mobile-v25 .top{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important;margin:2px 0 10px!important;}
   body.lji-mobile-v25 .top .title h1,body.lji-mobile-v25 main>section>.title h1{font-size:20px!important;line-height:1.1!important;color:#102e6d!important;letter-spacing:-.025em!important;}
   body.lji-mobile-v25 .top .title p,body.lji-mobile-v25 main>section>.title p{font-size:9px!important;color:#7c8da9!important;margin-top:4px!important;}
-  body.lji-mobile-v25 .card{border:1px solid #e1e9f3!important;border-radius:15px!important;background:#fff!important;box-shadow:0 7px 22px rgba(25,58,111,.055)!important;padding:12px!important;max-width:100%!important;overflow:auto!important;}
+  body.lji-mobile-v25 .card{border:1px solid #e1e9f3!important;border-radius:15px!important;background:#fff!important;box-shadow:0 7px 22px rgba(25,58,111,.055)!important;padding:12px!important;max-width:100%!important;overflow:visible!important;}
   body.lji-mobile-v25 .section-head{gap:8px!important;align-items:flex-start!important}.section-head h2{font-size:13px!important;color:#18356f!important}.section-head .badge{font-size:7px!important;padding:4px 6px!important}
   body.lji-mobile-v25 input,body.lji-mobile-v25 select,body.lji-mobile-v25 textarea{min-height:44px!important;border:1px solid #d5e0ed!important;border-radius:10px!important;background:#fff!important;color:#17305e!important;font-size:12px!important;padding:9px 10px!important;max-width:100%!important;}
   body.lji-mobile-v25 button.primary{background:linear-gradient(90deg,#0b2b75,#1558cb)!important;color:#fff!important;border:0!important;border-radius:10px!important;min-height:42px!important;font-size:10px!important;font-weight:800!important;}
@@ -143,7 +143,7 @@
 
   body.lji-mobile-v25 table{font-size:9px!important;}
   body.lji-mobile-v25 table th,body.lji-mobile-v25 table td{padding:8px 6px!important;}
-  body.lji-mobile-v25 .table-wrap,body.lji-mobile-v25 [id$="Table"],body.lji-mobile-v25 .deep-table{max-width:100%!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;}
+  body.lji-mobile-v25 .table-wrap,body.lji-mobile-v25 [id$="Table"],body.lji-mobile-v25 .deep-table{max-width:100%!important;overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;}
   body.lji-mobile-v25 #buyersTable table,body.lji-mobile-v25 #intentionsTable table,body.lji-mobile-v25 #intentMatchesTable table,body.lji-mobile-v25 #contactCheckTable table,body.lji-mobile-v25 #discardedTable table,body.lji-mobile-v25 #paraQuintoAndarTable table,body.lji-mobile-v25 #registrySearchesTable table,body.lji-mobile-v25 #adminUsersBody table{min-width:650px!important;}
 
   body.lji-mobile-v25 .settings-panel{position:fixed!important;inset:0!important;z-index:9700!important;width:100%!important;max-width:none!important;height:100dvh!important;overflow:auto!important;border-radius:0!important;padding:70px 10px 90px!important;background:#f7faff!important;}
@@ -158,3 +158,4 @@
   .lji-mobile-appbar .brand small{max-width:112px}.lji-mobile-appbar .actions>button{width:34px;height:34px}.lji-mobile-appbar .actions{gap:3px}
   .lji-m-quick{gap:4px}.lji-m-quick button{padding-left:2px;padding-right:2px}.lji-m-two{grid-template-columns:1fr 1fr}.lji-m-funnel>div{grid-template-columns:1fr 1fr}.lji-m-modules>div{grid-template-columns:1fr 1fr}
 }
+
