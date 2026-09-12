@@ -4,148 +4,116 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
 <title>LJ Radar Imob</title>
-<style>html,body{margin:0;min-height:100%;background:#041735}body{font-family:Arial,sans-serif}.lji-boot{position:fixed;inset:0;display:grid;place-items:center;color:#dfeaff;background:#041735;font:600 14px Arial,sans-serif;letter-spacing:.04em}</style>
+<style>
+  html,body{margin:0;min-height:100%;background:#eef5ff;font-family:Arial,sans-serif}
+  .lji-boot{position:fixed;inset:0;display:grid;place-items:center;color:#0a2a7a;background:#eef5ff;font:600 14px Arial,sans-serif;letter-spacing:.04em}
+</style>
 </head>
 <body>
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='30.0.3';
-  const BUST='20260911-stop-legacy-login-reinjection';
-  const logo='./lj-logo-compact.png?v='+BUILD;
-
-  function prepareCard(doc,card){
-    const oldBrand=card.querySelector('.auth-brand'); if(oldBrand) oldBrand.hidden=true;
-    const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
-
-    card.querySelectorAll('.lji-ref-card-head,.lji-approved-card-brand,.lji-m-brand').forEach(el=>el.remove());
-    const head=doc.createElement('div');
-    head.className='lji-ref-card-head';
-    head.innerHTML='<h2>Bem-vindo de volta!</h2><p>Acesse sua conta para continuar.</p>';
-    const firstField=card.querySelector('.auth-field');
-    if(firstField) card.insertBefore(head,firstField); else card.prepend(head);
-
-    const forgot=card.querySelector('#ljiForgotPassword');
-    card.querySelectorAll('.lji-login-controls,.lji-m-login-controls').forEach(el=>{
-      if(forgot && el.contains(forgot)) el.parentNode.insertBefore(forgot,el);
-      el.remove();
-    });
-    if(forgot){
-      const controls=doc.createElement('div');
-      controls.className='lji-login-controls';
-      controls.innerHTML='<label><input id="ljiRememberAccess" type="checkbox" checked><span></span><b>Lembrar acesso</b></label>';
-      forgot.parentNode.insertBefore(controls,forgot);
-      controls.appendChild(forgot);
-    }
-
-    const login=card.querySelector('#ljiAuthLogin');
-    card.querySelectorAll('.lji-login-divider,.lji-m-divider,.lji-request-access,.lji-m-request').forEach(el=>el.remove());
-    if(login){
-      const divider=doc.createElement('div');
-      divider.className='lji-login-divider';
-      divider.innerHTML='<span></span><b>ou</b><span></span>';
-      login.insertAdjacentElement('afterend',divider);
-      const req=doc.createElement('button');
-      req.type='button';
-      req.className='lji-request-access';
-      req.setAttribute('data-lji-request-access','1');
-      req.textContent='Solicitar acesso';
-      divider.insertAdjacentElement('afterend',req);
-    }
-
-    const info=card.querySelector('.auth-info');
-    if(info){info.textContent='Acesso restrito aos usuários autorizados.';info.style.display='block';}
-  }
-
-  function buildReferenceAuth(doc){
-    const overlay=doc.querySelector('#ljiAuthOverlay');
-    const card=overlay&&overlay.querySelector('.auth-card');
-    if(!overlay||!card) throw new Error('auth_overlay_missing');
-
-    prepareCard(doc,card);
-    overlay.className='auth-overlay lji-approved-v30';
-    overlay.dataset.v23Ready='1';
-    overlay.dataset.mobileV25='1';
-    overlay.dataset.approvedStatic='reference-20260911';
-
-    const shell=doc.createElement('div');
-    shell.className='lji-ref-shell';
-    shell.innerHTML='<div class="lji-ref-locale"><b>Brasil</b><i></i><b>PT-BR</b></div>';
-
-    const left=doc.createElement('section');
-    left.className='lji-ref-left';
-    left.innerHTML=`
-      <div class="lji-ref-brand">
-        <img src="${logo}" alt="LJ Radar Imob">
-        <p>Inteligência imobiliária<br>para captação e oportunidades.</p>
-      </div>
-      <div class="lji-ref-features">
-        <div class="lji-ref-feature"><i>▣</i><span><b>DADOS REAIS</b><em>Mais oportunidades</em></span></div>
-        <div class="lji-ref-feature"><i>⌁</i><span><b>TECNOLOGIA</b><em>Mais resultados</em></span></div>
-        <div class="lji-ref-feature"><i>♙</i><span><b>PESSOAS</b><em>Mais negócios</em></span></div>
-      </div>
-      <blockquote class="lji-ref-quote">“Informação hoje,<br>oportunidades amanhã.”</blockquote>
-      <div class="lji-ref-left-footer"><span>LJ Radar Imob &nbsp; © 2026</span><span>Inteligência para o mercado imobiliário</span></div>`;
-
-    const right=doc.createElement('section');
-    right.className='lji-ref-right';
-    const wrap=doc.createElement('div');
-    wrap.className='lji-ref-cardwrap';
-    wrap.appendChild(card);
-    const support=doc.createElement('button');
-    support.type='button';
-    support.className='lji-ref-support';
-    support.setAttribute('data-lji-support','1');
-    support.textContent='Falar com suporte';
-    wrap.appendChild(support);
-    right.appendChild(wrap);
-
-    shell.append(left,right);
-    overlay.replaceChildren(shell);
-  }
+  const BUILD='31.0.0';
+  const BUST='20260911-approved-login-image';
 
   function appendCss(doc,href,media){const link=doc.createElement('link');link.rel='stylesheet';link.href=href;if(media)link.media=media;doc.head.appendChild(link);}
   function appendScript(doc,src){const s=doc.createElement('script');s.src=src;doc.body.appendChild(s);}
 
+  async function loadApprovedBackground(){
+    const parts=await Promise.all([1,2,3,4,5,6].map(async n=>{
+      const r=await fetch(`./login-approved-bg-p${n}.txt?v=${BUILD}`,{cache:'no-store'});
+      if(!r.ok) throw new Error(`approved_bg_part_${n}_${r.status}`);
+      return (await r.text()).trim();
+    }));
+    return 'data:image/webp;base64,'+parts.join('');
+  }
+
+  function prepareCard(doc,card){
+    const oldBrand=card.querySelector('.auth-brand'); if(oldBrand) oldBrand.hidden=true;
+    const intro=card.querySelector(':scope > p'); if(intro) intro.hidden=true;
+    card.querySelectorAll('.lji-ref-card-head,.lji-approved-card-brand,.lji-m-brand,.lji-login-divider,.lji-m-divider,.lji-request-access,.lji-m-request,.lji-login-controls,.lji-m-login-controls').forEach(el=>el.remove());
+
+    const forgot=card.querySelector('#ljiForgotPassword');
+    const login=card.querySelector('#ljiAuthLogin');
+    if(forgot) forgot.textContent='Esqueceu sua senha?';
+
+    if(!card.querySelector('#ljiApprovedRemember')){
+      const remember=doc.createElement('label');
+      remember.className='lji-approved-remember';
+      remember.innerHTML='<input id="ljiApprovedRemember" type="checkbox" checked><span></span><b>Lembrar acesso</b>';
+      if(forgot) forgot.parentNode.insertBefore(remember,forgot); else if(login) login.parentNode.insertBefore(remember,login);
+    }
+
+    if(login){
+      const request=doc.createElement('button');
+      request.type='button';
+      request.className='lji-approved-request';
+      request.setAttribute('data-lji-request-access','1');
+      request.textContent='Solicitar acesso';
+      login.insertAdjacentElement('afterend',request);
+    }
+
+    const info=card.querySelector('.auth-info');
+    if(info) info.style.display='none';
+  }
+
+  function buildApprovedImageAuth(doc,bg){
+    const overlay=doc.querySelector('#ljiAuthOverlay');
+    const card=overlay&&overlay.querySelector('.auth-card');
+    if(!overlay||!card) throw new Error('auth_overlay_missing');
+    prepareCard(doc,card);
+
+    overlay.className='auth-overlay lji-approved-image-login';
+    overlay.dataset.v23Ready='1';
+    overlay.dataset.mobileV25='1';
+    overlay.dataset.approvedStatic='image-20260911';
+
+    const stage=doc.createElement('div');
+    stage.className='lji-approved-image-stage';
+    const img=doc.createElement('img');
+    img.className='lji-approved-image-bg';
+    img.src=bg;
+    img.alt='';
+    img.setAttribute('aria-hidden','true');
+    stage.appendChild(img);
+
+    const controls=doc.createElement('div');
+    controls.className='lji-approved-image-controls';
+    controls.appendChild(card);
+    stage.appendChild(controls);
+    overlay.replaceChildren(stage);
+  }
+
   try{
-    const response=await fetch('./app-shell-v22.50.4.html?boot='+BUST,{cache:'no-store'});
+    const [response,bg]=await Promise.all([
+      fetch('./app-shell-v22.50.4.html?boot='+BUST,{cache:'no-store'}),
+      loadApprovedBackground()
+    ]);
     if(!response.ok) throw new Error('shell_http_'+response.status);
     let html=await response.text();
     html=html.replaceAll('?v=22.50.4','?v='+BUILD);
     html=html.replace('LJ Radar Imob v22.50.4 · © 2026','LJ Radar Imob v'+BUILD+' · © 2026');
-    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Approved Reference Login · 11/09/2026 -->');
-
+    html=html.replace('<!-- BUILD: LJ Radar Imob v22.50.4 · Central de Ação Filtrada · 04/09/2026 -->','<!-- BUILD: LJ Radar Imob v'+BUILD+' · Approved Login Image · 11/09/2026 -->');
     const doc=new DOMParser().parseFromString(html,'text/html');
 
-    /* Define a autoridade do login ANTES que qualquer script do app rode. */
     const ownership=doc.createElement('script');
-    ownership.textContent="window.LJI_LOGIN_LAYOUT_OWNER='index-v30';";
+    ownership.textContent="window.LJI_LOGIN_LAYOUT_OWNER='approved-image-v31';";
     doc.head.insertBefore(ownership,doc.head.firstChild);
 
-    /* Remove o selo técnico legado da UI. */
-    doc.querySelectorAll('body *').forEach(el=>{
-      const text=(el.textContent||'').replace(/\s+/g,' ').trim();
-      if(text==='v22.50.4 · Filtros de Qualidade') el.remove();
-    });
+    const legacyNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','desktop-login-polish-v23.js'];
+    doc.querySelectorAll('script[src]').forEach(s=>{const src=s.getAttribute('src')||'';if(legacyNeedles.some(n=>src.includes(n)))s.remove();});
+    doc.querySelectorAll('link[href]').forEach(l=>{const h=l.getAttribute('href')||'';if(/desktop-layout-v23|desktop-login-polish-v23|desktop-login-approved-v30|mobile-v25/.test(h))l.remove();});
 
-    const oldLayoutNeedles=['approved-layout-bootstrap','auth-layout-direct','desktop-login-guard','desktop-logo-v23','desktop-layout-v23.js','mobile-v25.js','dashboard-v24.js','desktop-login-polish-v23.js','capture-center-v29.js','capture-collector-v29.js','qualified-leads-v29.js','gmail-system-v29.js','gmail-system-v29-5.js','responsive-consistency-v29-6.js'];
-    doc.querySelectorAll('script[src]').forEach(s=>{if(oldLayoutNeedles.some(n=>s.getAttribute('src').includes(n)))s.remove();});
-    doc.querySelectorAll('link[href]').forEach(l=>{const h=l.getAttribute('href');if(/desktop-layout-v23|desktop-login-polish-v23|desktop-login-approved-v30|dashboard-v24|mobile-v25|capture-center-v29|gmail-system-v29|responsive-consistency-v29-6/.test(h))l.remove();});
-
-    appendCss(doc,'./desktop-layout-v23.css?v='+BUILD);
     appendCss(doc,'./dashboard-v24.css?v='+BUILD);
-    appendCss(doc,'./mobile-v25.css?v='+BUILD,'(max-width: 900px)');
     appendCss(doc,'./capture-center-v29.css?v='+BUILD);
     appendCss(doc,'./gmail-system-v29.css?v='+BUILD);
     appendCss(doc,'./gmail-system-v29-5.css?v='+BUILD);
     appendCss(doc,'./responsive-consistency-v29-6.css?v='+BUILD);
-    appendCss(doc,'./desktop-login-approved-v30.css?v='+BUILD);
+    appendCss(doc,'./login-approved-image-v31.css?v='+BUILD);
 
-    buildReferenceAuth(doc);
+    buildApprovedImageAuth(doc,bg);
 
-    appendScript(doc,'./desktop-layout-v23.js?v='+BUILD);
     appendScript(doc,'./dashboard-v24.js?v='+BUILD);
-    appendScript(doc,'./mobile-v25.js?v='+BUILD);
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
     appendScript(doc,'./capture-collector-v29.js?v='+BUILD);
     appendScript(doc,'./qualified-leads-v29.js?v='+BUILD);
@@ -154,7 +122,7 @@
     appendScript(doc,'./responsive-consistency-v29-6.js?v='+BUILD);
 
     const behavior=doc.createElement('script');
-    behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';}if(e.target.closest('[data-lji-support]')&&info){info.textContent='Suporte LJ Radar Imob: fale com o administrador responsável pelo seu acesso.';info.style.display='block';}});";
+    behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';}});";
     doc.body.appendChild(behavior);
 
     const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
