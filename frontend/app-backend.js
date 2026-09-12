@@ -70,7 +70,13 @@
     window.LJI_CURRENT_USER={...(window.LJI_CURRENT_USER||{}),id:session?.user?.id||window.LJI_CURRENT_USER?.id||'',email,name,role,permissions:member?.permissions||window.LJI_CURRENT_USER?.permissions||{}};
     return name;
   }
-  function updateBaseSyncStatus(label){const el=document.getElementById('autoRefreshStatus');if(el)el.textContent=label;}
+  function baseSyncLabel(){
+    const current=Array.isArray(owners)?owners.filter(o=>o?.is_current).length:0;
+    const total=Array.isArray(owners)?owners.length:0;
+    const time=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    return `Atuais ${current} · histórico ${total} · ${time}`;
+  }
+  function updateBaseSyncStatus(label){const el=document.getElementById('autoRefreshStatus');if(el)el.textContent=label||baseSyncLabel();}
   function updateOperationState(label,state='neutral'){
     const strong=document.getElementById('operationStateLabel'),wrap=document.getElementById('dashOnlineState');
     if(strong)strong.textContent=label;
@@ -176,7 +182,7 @@
       buyers = buyersRemote.map(b=>({
         id:b.id,name:b.name,city:b.city||'',neighborhood:b.neighborhood||'',type:b.property_type||'Apartamento',transaction_type:b.transaction_type||'sale',budget:Number(b.budget_max||0),beds:Number(b.bedrooms_min||0),parking:Number(b.parking_min||0),area_min:Number(b.area_min||0),urgency:Number(b.urgency||2),source:b.source||'',contact:b.contact||'',source_url:b.source_url||'',published_at:b.published_at||''
       }));
-    }
+    }else if(buyersErr) noteRuntimeWarning('compradores',buyersErr);
 
     if(!historyRes.error && Array.isArray(historyRes.data)){
       owners = historyRes.data
@@ -222,10 +228,10 @@
         }))
         .sort((a,b)=>(new Date(b.activity_date).getTime()||0)-(new Date(a.activity_date).getTime()||0));
     }else if(historyRes.error){
-      console.error('Histórico de imóveis:',historyRes.error);
+      noteRuntimeWarning('histórico de imóveis',historyRes.error);
     }
 
-    updateBaseSyncStatus(`Base ${owners.length} · atualizada ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+    updateBaseSyncStatus();
     safeRenderAll();
     // Reforço pós-sincronização: os widgets comerciais do Dashboard precisam
     // usar a base já preenchida, e nunca o estado vazio inicial.
@@ -282,7 +288,8 @@
       renderDiscarded();
     }catch(e){
       console.error('Descartados / não aprovados:',e);
-      discardedCandidates=[];
+      // Preserve the last known dataset during a transient network/RLS error.
+      // An empty screen must never look like data was deleted.
       renderDiscarded();
     }
   }
@@ -296,7 +303,7 @@
       if(error)throw error;
       operationMetrics=Array.isArray(data)?data:[];
       renderOperationMetrics();
-    }catch(e){console.error('Gráficos da operação:',e);operationMetrics=[];renderOperationMetrics()}
+    }catch(e){console.error('Gráficos da operação:',e);renderOperationMetrics()}
   }
 
 
@@ -453,14 +460,16 @@
         sb.from('lj_v2_collector_source_profiles').select('source_id,is_active,total_queries,total_results,total_new_results,total_approved_leads,last_query_at'),
         sb.from('lj_v2_collector_runs').select('status,workspace_id,created_at,total_new_results,total_errors,total_queries,error_message').eq('workspace_id',cfg.WORKSPACE_ID).order('created_at',{ascending:false}).limit(1).maybeSingle()
       ]);
-      discoveredLeads=leadRes.error?[]:(leadRes.data||[]);
-      const profiles=new Map((profileRes.error?[]:(profileRes.data||[])).map(p=>[String(p.source_id),p]));
-      sourceProfiles=(sourceRes.error?[]:(sourceRes.data||[])).map(s=>({...s,...(profiles.get(String(s.id))||{}),source_active:s.is_active}));
+      if(!leadRes.error && Array.isArray(leadRes.data)) discoveredLeads=leadRes.data;
+      else if(leadRes.error) noteRuntimeWarning('leads descobertos',leadRes.error);
+      const profiles=new Map((!profileRes.error&&Array.isArray(profileRes.data)?profileRes.data:[]).map(p=>[String(p.source_id),p]));
+      if(!sourceRes.error && Array.isArray(sourceRes.data)) sourceProfiles=(sourceRes.data||[]).map(s=>({...s,...(profiles.get(String(s.id))||{}),source_active:s.is_active}));
+      else if(sourceRes.error) noteRuntimeWarning('fontes da coleta',sourceRes.error);
       updateCollectorServerBanner(runRes.data,runRes.error);
       renderDeepSearch();
       refreshCitySelectors();
       renderIntegrationStatus();
-    }catch(e){console.error('Busca Profunda:',e);discoveredLeads=[];updateCollectorServerBanner(null,e);renderDeepSearch()}
+    }catch(e){console.error('Busca Profunda:',e);updateCollectorServerBanner(null,e);renderDeepSearch()}
   }
 
   function patchWriters(){
@@ -566,7 +575,7 @@
         const jobs=[syncFromSupabase(),syncIntentions(),syncAdminData(),syncDiscoveryData(),syncOperationMetrics(),syncDiscardedData(),syncCommercialModules(),syncRegistrySearches(),syncMatchAlerts(),(window.loadLeadBlocklist?window.loadLeadBlocklist():Promise.resolve())];
         await Promise.allSettled(jobs);
         if(indicator){
-          indicator.textContent=`Base ${owners.length} · atualizada ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+          indicator.textContent=baseSyncLabel();
           indicator.classList.remove('auto-refresh-error');
         }
       }catch(e){
@@ -586,3 +595,4 @@
 
   initBackend().finally(()=>startAutoRefresh());
 })();
+
