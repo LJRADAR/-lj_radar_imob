@@ -111,6 +111,15 @@
   }
 
   function leadRows(){
+    // The mobile dashboard must reflect the same real Inbox data as desktop.
+    // Fall back to the discovery list only when there are no conversations yet.
+    const inbox=qa('#salesInboxThreads .sales-inbox-thread');
+    if(inbox.length){
+      return inbox.slice(0,6).map((el,i)=>{
+        const cells=qa('strong,span,small',el).map(x=>x.textContent.replace(/\s+/g,' ').trim()).filter(Boolean);
+        return {lead:cells[0]||`Conversa ${i+1}`,detail:cells[1]||'Mensagem registrada',source:'WhatsApp',region:cells[2]||'Lead vinculado',contact:cells[0]||'WhatsApp',type:'Conversa'};
+      });
+    }
     let rows=qa('#deepSearchTable tbody tr');if(!rows.length)rows=qa('#deepSearchTable table tr').slice(1);
     return rows.slice(0,6).map((tr,i)=>{const cells=qa('td',tr).map(td=>td.textContent.replace(/\s+/g,' ').trim()).filter(Boolean);const raw=cells.join(' · ');return {lead:cells[0]||`Lead ${i+1}`,detail:cells[1]||cells[2]||'Aguardando análise',source:/facebook/i.test(raw)?'Facebook':/apify/i.test(raw)?'Apify':/quinto/i.test(raw)?'Quinto Andar':/olx/i.test(raw)?'OLX':/radar|intenção/i.test(raw)?'Radar':'Coleta',region:cells.find(x=>/São Paulo|Santo André|São Bernardo|São Caetano|Diadema|Zona|ABC|SP\b/i.test(x))||'Região não informada',contact:(raw.match(/(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}/)||[])[0]||(/whatsapp/i.test(raw)?'WhatsApp':'—'),type:/permuta/i.test(raw)?'Permuta':/alug|loca/i.test(raw)?'Locação':/compra|procura/i.test(raw)?'Compra':/vend/i.test(raw)?'Venda':'Lead'};});
   }
@@ -205,3 +214,4 @@
   window.addEventListener('load',()=>{const main=q('main');if(main)observer.observe(main,{subtree:true,attributes:true,attributeFilter:['class']});});
   setInterval(()=>{if(isMobile()&&!document.hidden)refreshDashboard();},6000);
 })();
+
