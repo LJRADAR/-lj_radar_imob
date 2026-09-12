@@ -1,16 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractProfileWithClaude, updateBuyerFromExplicit, fetchExistingProfile } from "../_shared/sales-match-profile.ts";
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const WORKSPACE_RESOLUTION = "phone_number_id_with_legacy_empty_registry_fallback";
 const digits = (v: unknown) => String(v || "").replace(/\D/g, "");
 const samePhone = (a: unknown, b: unknown) => {
-  const x = digits(a), y = digits(b);
-  if (!x || !y) return false;
-  const n = Math.min(10, x.length, y.length);
-  return n >= 8 && x.slice(-n) === y.slice(-n);
+  const canonical = (value: unknown) => {
+    let d = digits(value);
+    if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+    return /^(?:[1-9]{2})(?:9\d{8}|[2-5]\d{7})$/.test(d) ? d : null;
+  };
+  const x = canonical(a), y = canonical(b);
+  return Boolean(x && y && (x === y || x.slice(-10) === y.slice(-10)));
 };
 const enc = new TextEncoder();
+
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(input, { ...init, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
+}
 
 async function validSignature(raw: string, signature: string, secret: string) {
   if (!signature.startsWith("sha256=")) return false;
@@ -46,6 +56,58 @@ function leadTitle(type: string, row: any) {
 
 function throwIfError(error: any, label: string) {
   if (error) throw new Error(`${label}: ${error.message || String(error)}`);
+}
+
+function namedWorkerSecret() {
+  try {
+    const parsed = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}");
+    return String(parsed.radar_lj_v2_collector || "").trim();
+  } catch { return ""; }
+}
+
+function workerAuthorized(req: Request) {
+  const token = String(req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const named = namedWorkerSecret();
+  const service = String(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  return Boolean(token && ((named && token === named) || (service && token === service)));
+}
+
+async function enqueueMessage(admin: any, workspace: string, change: any, m: any, phoneNumberId: string | null) {
+  const messageId = String(m?.id || "").trim();
+  if (!messageId) return null;
+  const { data, error } = await admin.from("lji_whatsapp_webhook_queue").insert({
+    workspace_id: workspace,
+    phone_number_id: phoneNumberId,
+    message_id: messageId,
+    from_phone: digits(m?.from),
+    payload: { change, message: m },
+  }).select("id").maybeSingle();
+  if (!error) return data?.id || null;
+  if (String(error.code || "") === "23505") {
+    const existing = await admin.from("lji_whatsapp_webhook_queue").select("id").eq("workspace_id", workspace).eq("message_id", messageId).maybeSingle();
+    throwIfError(existing.error, "enqueueMessage duplicate lookup");
+    return existing.data?.id || null;
+  }
+  throw error;
+}
+
+async function processQueue(admin: any) {
+  const claimed = await admin.rpc("lji_claim_whatsapp_webhook_queue", { p_limit: 5 });
+  throwIfError(claimed.error, "claim webhook queue");
+  let processed = 0, failed = 0;
+  for (const row of claimed.data || []) {
+    try {
+      const payload = row.payload || {};
+      const result = await processMessage(admin, String(row.workspace_id), payload.change, payload.message, row.phone_number_id || null, "durable_queue");
+      await admin.rpc("lji_finish_whatsapp_webhook_queue", { p_id: row.id, p_ok: true });
+      processed += result?.skipped ? 0 : 1;
+    } catch (e) {
+      failed++;
+      await admin.rpc("lji_finish_whatsapp_webhook_queue", { p_id: row.id, p_ok: false, p_error: String((e as Error)?.message || e) });
+      console.error("durable webhook queue item failed", row.message_id, e);
+    }
+  }
+  return { claimed: (claimed.data || []).length, processed, failed };
 }
 
 async function eventExists(admin: any, workspace: string, eventType: string, messageId: string) {
@@ -215,7 +277,7 @@ async function analyze(admin: any, workspace: string, phone: string, lead: any) 
     const model = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5";
     const transcript = conv.map((e: any) => `${e.event_type === "whatsapp_message_received" ? "CLIENTE" : "EQUIPE"}: ${String(e.details?.text || "")}`).join("\n").slice(-12000);
     const system = `Você analisa conversas comerciais imobiliárias reais no LJ Sales. Não invente fatos. Responda SOMENTE JSON válido com intent_level (high|medium|low), objection (string ou null), score_delta (-20..20), analysis_summary (máx 220 caracteres), recommended_action (máx 220 caracteres), confidence (strong|partial|limited), stage_suggestion (replied|qualified|visit_scheduled|proposal|negotiation|null).`;
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model, max_tokens: 500, temperature: 0.2, system, messages: [{ role: "user", content: `LEAD: ${JSON.stringify(lead)}\nCONVERSA:\n${transcript}` }] }),
@@ -389,6 +451,16 @@ Deno.serve(async (req) => {
 
   try {
     const raw = await req.text();
+    const requestBody = (() => { try { return JSON.parse(raw); } catch { return null; } })();
+    if (requestBody?.action === "process_queue") {
+      if (!workerAuthorized(req)) return new Response("unauthorized", { status: 401 });
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+      if (!supabaseUrl || !serviceRole) return new Response("supabase_not_configured", { status: 503 });
+      const admin = createClient(supabaseUrl, serviceRole);
+      const result = await processQueue(admin);
+      return new Response(JSON.stringify({ ok: result.failed === 0, ...result, version: VERSION }), { status: result.failed ? 500 : 200, headers: { "Content-Type": "application/json" } });
+    }
     const secret = Deno.env.get("META_APP_SECRET") || "";
     if (!secret) return new Response("webhook_not_configured", { status: 503 });
     if (!(await validSignature(raw, req.headers.get("x-hub-signature-256") || "", secret))) {
@@ -424,11 +496,15 @@ Deno.serve(async (req) => {
         }
 
         for (const m of change?.value?.messages || []) {
+          let queueId: string | null = null;
           try {
+            queueId = await enqueueMessage(admin, routing.workspace, change, m, routing.phone_number_id);
             const result = await processMessage(admin, routing.workspace, change, m, routing.phone_number_id, routing.method);
+            if (queueId) await admin.rpc("lji_finish_whatsapp_webhook_queue", { p_id: queueId, p_ok: true });
             if (!result?.skipped) processed++;
           } catch (e) {
             failed = true;
+            if (queueId) await admin.rpc("lji_finish_whatsapp_webhook_queue", { p_id: queueId, p_ok: false, p_error: String((e as Error)?.message || e) });
             const messageId = String(m?.id || "");
             const from = digits(m?.from);
             console.error(`webhook processing failed for ${messageId}`, e);

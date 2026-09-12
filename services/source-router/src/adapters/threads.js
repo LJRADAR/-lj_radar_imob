@@ -1,11 +1,12 @@
 import { fetchJson } from '../http.js';
 import { canonicalCity, normalizeText } from '../normalize.js';
+import { professionalDescription } from '../quality.js';
 
 const API = 'https://graph.threads.net';
 const FIELDS = 'id,media_product_type,media_type,permalink,username,text,timestamp,shortcode,is_quote_post,has_replies';
 
 function professional(text) {
-  return /\b(imobiliaria|corretor(?:a)?|creci|consultor(?:a)?\s+imobiliari|incorporadora|construtora|empreendimentos|lancamento imobiliario)\b/.test(normalizeText(text));
+  return /\b(imobiliaria|corretor(?:a)?|creci|consultor(?:a)?\s+imobiliari|incorporadora|construtora|empreendimentos|lancamento imobiliario)\b/.test(professionalDescription(text));
 }
 
 function ownerSignal(text, tx) {
@@ -103,7 +104,8 @@ export async function collectThreads(request, { token, timeoutMs }) {
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const all = [];
   const perQuery = [];
-  for (const query of queries(request)) {
+  const deadline = Date.now() + timeoutMs;
+  await Promise.all(queries(request).map(async query => {
     const url = new URL(`${API}/keyword_search`);
     url.searchParams.set('q', query);
     url.searchParams.set('search_type', 'RECENT');
@@ -112,7 +114,7 @@ export async function collectThreads(request, { token, timeoutMs }) {
     url.searchParams.set('limit', '50');
     url.searchParams.set('since', since);
     try {
-      const payload = await fetchJson(url.toString(), { token, timeoutMs });
+      const payload = await fetchJson(url.toString(), { token, timeoutMs: Math.max(1, deadline - Date.now()) });
       const posts = Array.isArray(payload?.data) ? payload.data : [];
       perQuery.push({ query, raw_count: posts.length, ok: true });
       for (const post of posts) {
@@ -120,9 +122,9 @@ export async function collectThreads(request, { token, timeoutMs }) {
         if (normalized) all.push(normalized);
       }
     } catch (error) {
-      perQuery.push({ query, raw_count: 0, ok: false, error: error instanceof Error ? error.message : String(error) });
+      perQuery.push({ query, raw_count: 0, ok: false, error: error?.name === 'AbortError' ? 'source_timeout' : 'source_request_failed' });
     }
-  }
+  }));
 
   const dedup = new Map();
   for (const item of all) if (item.source_url && !dedup.has(item.source_url)) dedup.set(item.source_url, item);

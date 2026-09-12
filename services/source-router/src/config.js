@@ -8,6 +8,8 @@ const csv = (value) => String(value || '')
   .map((item) => item.trim())
   .filter(Boolean);
 
+const apifyTimeoutSecs = clamp(process.env.APIFY_TIMEOUT_SECS, 35, 10, 40);
+
 export const config = {
   port: Number(process.env.PORT || 10000),
   authVerifierUrl: String(process.env.LJI_SOURCE_ROUTER_AUTH_URL || '').trim(),
@@ -33,6 +35,6 @@ export const config = {
     'São Paulo Zona Norte': String(process.env.APIFY_TASK_OLX_ZN || '').trim(),
   },
   apifyMaxChargeUsd: clamp(process.env.APIFY_MAX_CHARGE_USD, 0.25, 0.01, 5),
-  apifyTimeoutSecs: clamp(process.env.APIFY_TIMEOUT_SECS, 35, 10, 40),
-  requestTimeoutMs: Math.max(3000, Math.min(45000, Number(process.env.SOURCE_REQUEST_TIMEOUT_MS || 40000))),
+  apifyTimeoutSecs,
+  requestTimeoutMs: Math.max(apifyTimeoutSecs * 1000 + 10000, clamp(process.env.SOURCE_REQUEST_TIMEOUT_MS, 50000, 3000, 60000)),
 };

@@ -20,12 +20,14 @@
   function appendScript(doc,src){const s=doc.createElement('script');s.src=src;doc.body.appendChild(s);}
 
   async function loadApprovedBackground(){
-    const parts=await Promise.all([1,2,3,4,5,6].map(async n=>{
+    const parts=await Promise.allSettled([1,2,3,4,5,6].map(async n=>{
       const r=await fetch(`./login-approved-bg-p${n}.txt?v=${BUILD}`,{cache:'no-store'});
       if(!r.ok) throw new Error(`approved_bg_part_${n}_${r.status}`);
       return (await r.text()).trim();
     }));
-    return 'data:image/webp;base64,'+parts.join('');
+    const encoded=parts.every(p=>p.status==='fulfilled'&&/^[A-Za-z0-9+/=]+$/.test(p.value)&&p.value.length>100)
+      ? parts.map(p=>p.value).join('') : '';
+    return encoded ? 'data:image/webp;base64,'+encoded : './banner-cidade-exata.jpg?v='+BUILD;
   }
 
   function prepareCard(doc,card){

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const VERSION = "1.2.0";
 const FUNCTION_NAME = "lji-source-router-auth-v1";
@@ -6,6 +7,19 @@ const NAMED_SECRET_KEY = "radar_lj_v2_collector";
 const MAX_SKEW_MS = 120_000;
 const ROUTER_URL = "https://lji-source-router.onrender.com";
 const ALLOWED_PATHS = new Set(["/collect", "/verify-quinto"]);
+
+async function consumeNonce(nonce: string, timestamp: number): Promise<boolean | null> {
+  const url = Deno.env.get("SUPABASE_URL")?.trim();
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!url || !service) return null;
+  const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await admin.rpc("lji_consume_router_auth_nonce", {
+    p_nonce: nonce,
+    p_expires_at: new Date(timestamp + MAX_SKEW_MS).toISOString(),
+  });
+  if (error) return null;
+  return data === true;
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -179,6 +193,10 @@ Deno.serve(async (req) => {
 
   const valid = await verifySignature(secret, path, timestamp, nonce, bodySha256, signature);
   if (!valid) return json({ ok: false, error: "signature_invalid" }, 401);
+
+  const nonceAccepted = await consumeNonce(nonce, ts);
+  if (nonceAccepted === null) return json({ ok: false, error: "replay_protection_unavailable" }, 503);
+  if (!nonceAccepted) return json({ ok: false, error: "signature_replayed" }, 401);
 
   return json({ ok: true, version: VERSION, auth_scheme: "hmac-sha256-v1", signed_path: path });
 });

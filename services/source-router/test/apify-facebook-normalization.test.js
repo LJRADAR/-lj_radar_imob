@@ -4,8 +4,23 @@ import {
   inferTransactionType,
   normalizeApifyItem,
   parseFacebookLocation,
+  parseCount,
+  normalizeStateCode,
   parseMoney,
 } from '../src/adapters/apify.js';
+
+test('ambiguous numeric ranges are never persisted as a single metric', () => {
+  assert.equal(parseMoney('2 a 3 quartos'), null);
+  assert.equal(parseCount('2 a 3 quartos'), null);
+  assert.equal(parseCount('101'), null);
+  assert.equal(parseCount('3 quartos'), 3);
+});
+
+test('state normalization accepts official names but fails closed on unknown values', () => {
+  assert.equal(normalizeStateCode('São Paulo'), 'SP');
+  assert.equal(normalizeStateCode('sp'), 'SP');
+  assert.equal(normalizeStateCode('Florida'), null);
+});
 
 test('parseMoney handles Brazilian and marketplace thousands correctly', () => {
   assert.equal(parseMoney('R$420,000'), 420000);

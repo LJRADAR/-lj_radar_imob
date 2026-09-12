@@ -3,13 +3,31 @@ services:
     name: lji-source-router
     runtime: node
     rootDir: services/source-router
-    buildCommand: npm install
+    buildCommand: npm ci --omit=dev && npm test
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      - key: LJI_SOURCE_ROUTER_TOKEN
-        generateValue: true
-      - key: MERCADOLIVRE_ACCESS_TOKEN
+      - key: LJI_SOURCE_ROUTER_AUTH_URL
         sync: false
+      - key: THREADS_ACCESS_TOKEN
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: APIFY_TASK_OLX
+        sync: false
+      - key: APIFY_TASK_INSTAGRAM
+        sync: false
+      - key: APIFY_TASK_FACEBOOK
+        sync: false
+      - key: APIFY_FACEBOOK_GROUP_URLS
+        sync: false
+      - key: APIFY_TASK_TELEGRAM
+        sync: false
+      - key: APIFY_TASK_QUINTO
+        sync: false
+      - key: APIFY_MAX_CHARGE_USD
+        value: "0.38"
+      - key: APIFY_TIMEOUT_SECS
+        value: "40"
       - key: SOURCE_REQUEST_TIMEOUT_MS
-        value: "9000"
+        value: "50000"

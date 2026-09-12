@@ -99,9 +99,11 @@ begin
     end if;
 
     v_seller_type := public.lji_norm_text(coalesce(v_raw->>'seller_type',v_raw->'attributes'->>'seller_type',''));
-    v_content := public.lji_norm_text(concat_ws(' ',v_raw->>'seller_nickname',r.title,r.snippet,v_raw->>'description',v_seller_type));
-    v_professional := v_seller_type in ('business','professional','company','loja','dealer')
-      or v_content ~ '(imobiliaria|imoveis ltda|negocios imobiliarios|corretor|corretora|creci|consultor imobiliario|consultora imobiliaria|incorporadora|construtora|empreendimentos imobiliarios)';
+    v_seller_name := nullif(v_raw->>'seller_nickname','');
+    v_content := public.lji_norm_text(concat_ws(' ',v_seller_name,r.title,r.snippet,v_raw->>'description',v_seller_type));
+    v_professional := public.lji_is_professional_advertiser_text(
+      v_seller_type, v_seller_name, v_raw->>'description'
+    );
 
     if v_reason is null and v_professional then
       v_reason := 'professional_advertiser';

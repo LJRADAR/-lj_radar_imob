@@ -22,6 +22,62 @@ window.LJI_getSupabaseClient=function(){
 };
 
 function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c])); }
+
+// Data from leads is decoded as JSON only; it never becomes JavaScript source.
+function uiAction(name,args,event='click'){
+  return `data-lji-${event}="${esc(JSON.stringify([name,...args]))}"`;
+}
+(function installSafeLeadActions(){
+  const actions=Object.freeze({
+    approveSalesAction:args=>approveSalesAction(...args),
+    cancelSalesAction:args=>cancelSalesAction(...args),
+    completeSalesAction:args=>completeSalesAction(...args),
+    confirmContactManually:args=>confirmContactManually(...args),
+    confirmRegistryOwner:args=>confirmRegistryOwner(...args),
+    copyPipelineFollowUp:args=>copyPipelineFollowUp(...args),
+    copyPropertyLink:args=>copyPropertyLink(...args),
+    copySalesQueueMessage:args=>copySalesQueueMessage(...args),
+    deleteBuyer:args=>deleteBuyer(...args),
+    deleteCompanyDemand:args=>deleteCompanyDemand(...args),
+    deleteTradeIntent:args=>deleteTradeIntent(...args),
+    discardLead:args=>discardLead(...args),
+    dismissAlert:args=>dismissAlert(...args),
+    go:args=>go(...args),
+    markAlertSeen:args=>markAlertSeen(...args),
+    openActionDestination:args=>openActionDestination(...args),
+    openLead360:args=>openLead360(...args),
+    openPermissionEditor:args=>openPermissionEditor(...args),
+    openPropertyMenu:(args,el,event)=>openPropertyMenu(event,...args),
+    openRegistryForProperty:args=>openRegistryForProperty(...args),
+    openSalesInboxThread:args=>openSalesInboxThread(...args),
+    registryFromMenu:(args)=>{document.getElementById('propertyPopover')?.classList.remove('open');return openRegistryForProperty(...args)},
+    rejectOwner:(args)=>{if(confirm('Descartar este imóvel? Ele some das telas gerais.'))return setOwnerRadarStatus(args[0],'rejected')},
+    resetUserPermissions:args=>resetUserPermissions(...args),
+    saveSales360Activity:args=>saveSales360Activity(...args),
+    saveUserPermissions:args=>saveUserPermissions(...args),
+    setContactOverride:args=>setContactOverride(...args),
+    setOwnerHandler:(args,el)=>setOwnerHandler(...args,el.value),
+    setOwnerRadarStatus:args=>setOwnerRadarStatus(...args),
+    setPipelineStage:(args,el)=>setPipelineStage(...args,el.value,el),
+    setRegistrySearchStatus:args=>setRegistrySearchStatus(...args)
+  });
+  for(const type of ['click','change'])document.addEventListener(type,event=>{
+    const el=event.target?.closest?.(`[data-lji-${type}]`);
+    if(!el||el.disabled)return;
+    try{
+      const payload=JSON.parse(el.getAttribute(`data-lji-${type}`));
+      if(!Array.isArray(payload)||!Object.hasOwn(actions,payload[0]))return;
+      event.preventDefault();
+      Promise.resolve(actions[payload[0]](payload.slice(1),el,event)).catch(error=>console.error('Lead action failed',error));
+    }catch(error){console.error('Invalid lead action',error)}
+  });
+  document.addEventListener('error',event=>{
+    const el=event.target;
+    if(!el?.matches?.('img[data-lji-image-fallback]'))return;
+    const parent=el.parentElement;
+    if(parent){parent.classList.remove('has-image');parent.textContent=el.dataset.ljiImageFallback;}
+  },true);
+})();
 let owners=[];
 let buyers=[];
 let matchAlerts=[];
@@ -50,7 +106,7 @@ function ownerHandlerControl(o){
   const options=['<option value="">Não tratado</option>'].concat(
     ownerTeamMembers.filter(x=>x.is_active!==false).map(u=>`<option value="${esc(u.user_id)}" ${String(current)===String(u.user_id)?'selected':''}>${esc(u.name)} · ${esc(roleLabel(u.role))}</option>`)
   ).join('');
-  return `<select class="handler-select" onchange="setOwnerHandler('${esc(o.opportunity_id)}',this.value)" title="Quem tratou este lead">${options}</select>
+  return `<select class="handler-select" ${uiAction('setOwnerHandler',[o.opportunity_id],'change')} title="Quem tratou este lead">${options}</select>
     ${o.handled_at?`<div class="handler-date">${new Date(o.handled_at).toLocaleDateString('pt-BR')}</div>`:''}`;
 }
 async function setOwnerHandler(ownerId,userId){
@@ -83,7 +139,7 @@ function renderAdminUsers(){
   const state=window.LJI_ADMIN_STATE||{},rows=state.members||[],box=document.getElementById('adminUsersBody'),count=document.getElementById('adminUsersCount');
   if(count)count.textContent=`${rows.length} usuário${rows.length===1?'':'s'}`;if(!box)return;
   if(!rows.length){box.innerHTML='<div class="empty">Nenhum usuário encontrado.</div>';return}
-  box.innerHTML=`<div class="user-permission-list">${rows.map(u=>{const modules=modulesFromPermissions(u.role,u.permissions),canEdit=window.LJI_CURRENT_USER?.role==='super_admin'&&u.role!=='super_admin';return `<button class="user-permission-card" type="button" ${canEdit?`onclick="openPermissionEditor('${esc(u.user_id)}')"`:''}><div class="user-permission-avatar">${esc((u.name||'U').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase())}</div><div class="user-permission-main"><strong>${esc(u.name||'Usuário')}</strong><span>${esc(roleLabel(u.role))} · ${u.is_active?'Ativo':'Inativo'}</span><small>${u.role==='super_admin'?'Acesso total':modules.length+' tela(s) liberada(s)'}</small></div><div class="user-permission-action">${canEdit?'Editar telas ›':'Protegido'}</div></button>`}).join('')}</div>`;
+  box.innerHTML=`<div class="user-permission-list">${rows.map(u=>{const modules=modulesFromPermissions(u.role,u.permissions),canEdit=window.LJI_CURRENT_USER?.role==='super_admin'&&u.role!=='super_admin';return `<button class="user-permission-card" type="button" ${canEdit?`${uiAction('openPermissionEditor',[u.user_id],'click')}`:''}><div class="user-permission-avatar">${esc((u.name||'U').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase())}</div><div class="user-permission-main"><strong>${esc(u.name||'Usuário')}</strong><span>${esc(roleLabel(u.role))} · ${u.is_active?'Ativo':'Inativo'}</span><small>${u.role==='super_admin'?'Acesso total':modules.length+' tela(s) liberada(s)'}</small></div><div class="user-permission-action">${canEdit?'Editar telas ›':'Protegido'}</div></button>`}).join('')}</div>`;
 }
 async function updateMemberRole(userId,role){
   if(window.LJI_CURRENT_USER?.role!=='super_admin'){toast('Somente o CEO altera permissões.');return}
@@ -269,7 +325,7 @@ function modulesFromPermissions(role,p){
   return defaultModulesForRole(role);
 }
 function safeHttpUrl(value){
-  try{const url=new URL(String(value||'').trim());return (url.protocol==='http:'||url.protocol==='https:')?url.href:''}catch(_){return''}
+  try{const url=new URL(String(value||'').trim());return ((url.protocol==='http:'||url.protocol==='https:')&&!url.username&&!url.password)?url.href:''}catch(_){return''}
 }
 function safeImageUrl(value){ return safeHttpUrl(value); }
 function safeTel(value){
@@ -445,7 +501,7 @@ function openPermissionEditor(userId){
   const current=modulesFromPermissions(u.role,u.permissions);
   const box=document.getElementById('permissionEditor');if(!box)return;
   box.classList.remove('hidden');
-  box.innerHTML=`<div class="permission-panel"><div class="permission-head"><div><h2>${esc(u.name)}</h2><span>${esc(roleLabel(u.role))}</span></div><button class="permission-close" onclick="document.getElementById('permissionEditor').classList.add('hidden')">×</button></div>${u.role==='super_admin'?'<div class="notice">O CEO mantém acesso total.</div>':`<div class="permission-grid">${MODULE_DEFS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${current.includes(key)?'checked':''}> <span>${esc(label)}</span></label>`).join('')}</div><div class="permission-actions"><button class="secondary" onclick="resetUserPermissions('${esc(u.user_id)}','${esc(u.role)}')">Restaurar padrão do perfil</button><button class="primary" onclick="saveUserPermissions('${esc(u.user_id)}')">Salvar telas</button></div>`}</div>`;
+  box.innerHTML=`<div class="permission-panel"><div class="permission-head"><div><h2>${esc(u.name)}</h2><span>${esc(roleLabel(u.role))}</span></div><button class="permission-close" onclick="document.getElementById('permissionEditor').classList.add('hidden')">×</button></div>${u.role==='super_admin'?'<div class="notice">O CEO mantém acesso total.</div>':`<div class="permission-grid">${MODULE_DEFS.map(([key,label])=>`<label><input type="checkbox" value="${key}" ${current.includes(key)?'checked':''}> <span>${esc(label)}</span></label>`).join('')}</div><div class="permission-actions"><button class="secondary" ${uiAction('resetUserPermissions',[u.user_id,u.role],'click')}>Restaurar padrão do perfil</button><button class="primary" ${uiAction('saveUserPermissions',[u.user_id],'click')}>Salvar telas</button></div>`}</div>`;
 }
 async function saveUserPermissions(userId){const box=document.getElementById('permissionEditor'),client=window.LJI_BACKEND?.client,cfg=window.LJI_CONFIG||{};if(!box||!client)return;const modules=[...box.querySelectorAll('input[type=checkbox]:checked')].map(x=>x.value);const {error}=await client.from('lji_workspace_members').update({permissions:{modules}}).eq('workspace_id',cfg.WORKSPACE_ID).eq('user_id',userId);if(error){console.error(error);toast('Falha ao salvar permissões.');return}toast('Telas do usuário atualizadas.');await window.LJI_BACKEND?.syncAdmin?.();box.classList.add('hidden')}
 async function resetUserPermissions(userId,role){const client=window.LJI_BACKEND?.client,cfg=window.LJI_CONFIG||{};if(!client)return;const {error}=await client.from('lji_workspace_members').update({permissions:{modules:defaultModulesForRole(role)}}).eq('workspace_id',cfg.WORKSPACE_ID).eq('user_id',userId);if(error){toast('Falha ao restaurar.');return}toast('Permissões restauradas.');await window.LJI_BACKEND?.syncAdmin?.();openPermissionEditor(userId)}
@@ -1117,7 +1173,7 @@ function renderRegistrySearches(){
   if(!rows.length){box.innerHTML='<div class="empty">Nenhuma pesquisa registral salva.</div>';return}
   box.innerHTML=`<div class="registry-list">${rows.map(r=>{const [label,cls]=registryStatusMeta(r.status,r),mun=municipalRegistryUrl(r.city);return `<article class="registry-row">
     <div class="registry-row-main"><div class="registry-row-title"><strong>${esc(r.address)}</strong><span class="badge ${cls}">${esc(label)}</span></div><span>${esc(r.city)} / ${esc(r.state_code)}${r.cep?' · CEP '+esc(r.cep):''}</span><small>${r.registry_office?'Cartório: '+esc(r.registry_office)+' · ':''}${r.registry_number?'Matrícula '+esc(r.registry_number):'Matrícula não informada'}</small>${r.official_owner_name?`<div class="registry-owner-confirmed"><b>Titular registral:</b> ${esc(r.official_owner_name)}<small>Referência: ${esc(r.evidence_reference||'')}</small></div>`:''}</div>
-    <div class="registry-row-actions"><a href="${RI_DIGITAL_URL}" target="_blank" rel="noopener noreferrer">RI Digital ↗</a>${mun?`<a href="${esc(mun)}" target="_blank" rel="noopener noreferrer">Apoio municipal ↗</a>`:''}${r.status!=='certificate_requested'&&r.status!=='confirmed'?`<button onclick="setRegistrySearchStatus('${esc(r.id)}','certificate_requested')">Marcar certidão solicitada</button>`:''}${r.status!=='confirmed'?`<button class="registry-confirm" onclick="confirmRegistryOwner('${esc(r.id)}')">Confirmar titular</button>`:''}</div>
+    <div class="registry-row-actions"><a href="${RI_DIGITAL_URL}" target="_blank" rel="noopener noreferrer">RI Digital ↗</a>${mun?`<a href="${esc(safeHttpUrl(mun))}" target="_blank" rel="noopener noreferrer">Apoio municipal ↗</a>`:''}${r.status!=='certificate_requested'&&r.status!=='confirmed'?`<button ${uiAction('setRegistrySearchStatus',[r.id,'certificate_requested'],'click')}>Marcar certidão solicitada</button>`:''}${r.status!=='confirmed'?`<button class="registry-confirm" ${uiAction('confirmRegistryOwner',[r.id],'click')}>Confirmar titular</button>`:''}</div>
   </article>`}).join('')}</div>`;
 }
 function renderOwners(){
@@ -1136,7 +1192,7 @@ function renderOwners(){
     <td>${contactHtml(o)}</td>
     <td><span class="owner-status ${st.cls}">${esc(st.label)}</span></td>
     <td>${ownerHandlerControl(o)}</td>
-    <td><div class="owner-actions">${url?`<a class="source-action" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>`:`<span class="source-missing">Link não informado</span>`}<button class="owner-registry" type="button" onclick="openRegistryForProperty('${esc(o.id)}')" title="Pesquisar titular registral">Titularidade</button>${o.is_current?`<button class="owner-more" type="button" onclick="openPropertyMenu(event,'${esc(o.id)}')" title="Mais ações">⋯</button>`:''}</div></td>
+    <td><div class="owner-actions">${url?`<a class="source-action" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir anúncio ↗</a>`:`<span class="source-missing">Link não informado</span>`}<button class="owner-registry" type="button" ${uiAction('openRegistryForProperty',[o.id],'click')} title="Pesquisar titular registral">Titularidade</button>${o.is_current?`<button class="owner-more" type="button" ${uiAction('openPropertyMenu',[o.id],'click')} title="Mais ações">⋯</button>`:''}</div></td>
    </tr>`;
  }).join('');
  const cards=rows.map(o=>{
@@ -1150,8 +1206,8 @@ function renderOwners(){
      <div class="m-card-row m-card-handler">${ownerHandlerControl(o)}</div>
      <div class="m-card-actions">
        ${url?`<a class="source-action" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>`:''}
-       <button class="owner-registry" type="button" onclick="openRegistryForProperty('${esc(o.id)}')">Titularidade</button>
-       ${o.is_current?`<button class="owner-more" type="button" onclick="openPropertyMenu(event,'${esc(o.id)}')">⋯</button>`:''}
+       <button class="owner-registry" type="button" ${uiAction('openRegistryForProperty',[o.id],'click')}>Titularidade</button>
+       ${o.is_current?`<button class="owner-more" type="button" ${uiAction('openPropertyMenu',[o.id],'click')}>⋯</button>`:''}
      </div>
    </article>`;
  }).join('');
@@ -1165,7 +1221,7 @@ function renderBuyers(){
  set('bMatched',matchedBuyerIds.size);
  const box=document.getElementById('buyersTable');if(!box)return;
  if(!buyers.length){box.innerHTML='<div class="empty">Nenhuma demanda de comprador cadastrada.</div>';return}
- const tableRows=buyers.map(b=>`<tr><td><strong>${esc(b.name)}</strong><br><span class="small">${esc(b.contact||'')}</span></td><td>${esc(b.type)} · ${esc(b.city)}${b.neighborhood?' · '+esc(b.neighborhood):''} <span class="badge mid">${b.transaction_type==='rent'?'Locação':b.transaction_type==='both'?'Compra e locação':'Compra'}</span><br><span class="small">${esc(b.beds)}+ dorm · ${esc(b.parking)}+ vagas${Number(b.area_min||0)?' · '+esc(b.area_min)+'+ m²':''}</span></td><td>${esc(money(b.budget))}</td><td><span class="badge ${b.urgency===3?'hot':b.urgency===2?'good':'mid'}">${b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa'}</span></td><td>${esc(b.source)}</td><td><button class="danger" onclick="deleteBuyer('${esc(b.id)}')">Excluir</button></td></tr>`).join('');
+ const tableRows=buyers.map(b=>`<tr><td><strong>${esc(b.name)}</strong><br><span class="small">${esc(b.contact||'')}</span></td><td>${esc(b.type)} · ${esc(b.city)}${b.neighborhood?' · '+esc(b.neighborhood):''} <span class="badge mid">${b.transaction_type==='rent'?'Locação':b.transaction_type==='both'?'Compra e locação':'Compra'}</span><br><span class="small">${esc(b.beds)}+ dorm · ${esc(b.parking)}+ vagas${Number(b.area_min||0)?' · '+esc(b.area_min)+'+ m²':''}</span></td><td>${esc(money(b.budget))}</td><td><span class="badge ${b.urgency===3?'hot':b.urgency===2?'good':'mid'}">${b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa'}</span></td><td>${esc(b.source)}</td><td><button class="danger" ${uiAction('deleteBuyer',[b.id],'click')}>Excluir</button></td></tr>`).join('');
  const cards=buyers.map(b=>{
    const urg=b.urgency===3?'Alta':b.urgency===2?'Média':'Baixa';
    const urgCls=b.urgency===3?'hot':b.urgency===2?'good':'mid';
@@ -1176,7 +1232,7 @@ function renderBuyers(){
      <div class="m-card-price">${money(b.budget)}</div>
      <div class="m-card-specs"><span class="badge mid">${esc(mode)}</span> ${esc(b.beds||0)}+ dorm · ${esc(b.parking||0)}+ vagas${Number(b.area_min||0)?' · '+esc(b.area_min)+'+ m²':''}</div>
      <div class="m-card-row small">${esc(b.contact||'Sem contato')} · ${esc(b.source||'')}</div>
-     <div class="m-card-actions"><button class="danger" type="button" onclick="deleteBuyer('${esc(b.id)}')">Excluir</button></div>
+     <div class="m-card-actions"><button class="danger" type="button" ${uiAction('deleteBuyer',[b.id],'click')}>Excluir</button></div>
    </article>`;
  }).join('');
  box.innerHTML=`<div class="desktop-table-wrap"><table><thead><tr><th>Comprador</th><th>Demanda</th><th>Orçamento</th><th>Urgência</th><th>Origem</th><th></th></tr></thead><tbody>${tableRows}</tbody></table></div><div class="mobile-card-list">${cards}</div>`;
@@ -1200,7 +1256,7 @@ function matchPropertyCell(m,compact=false){
   const parking=Number(m.opportunity_parking||o?.parking||0);
   const qa=m.quinto_status||o?.quinto_status||'';
   return `<div class="match-property-card ${compact?'compact':''}">
-    <div class="match-property-image">${image?`<img src="${esc(image)}" alt="${esc(title)}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('image-missing')">`:'<span>Sem foto</span>'}</div>
+    <div class="match-property-image">${image?`<img src="${esc(image)}" alt="${esc(title)}" loading="lazy" data-lji-image-fallback="Sem foto">`:'<span>Sem foto</span>'}</div>
     <div><strong>${esc(title)}</strong><span>${esc(city)}${price?' · '+money(price):''}${beds?' · '+beds+' dorm.':''}${parking?' · '+parking+' vagas':''}${compact&&qa?' · QA: '+esc(qa):''}</span></div>
   </div>`;
 }
@@ -1310,7 +1366,7 @@ function groupedMatchesHtml(groups,compact=false){
     <div class="match-group-head">
       <div class="match-person"><div class="match-person-avatar">${esc((m.person_name||'?').trim().charAt(0).toUpperCase())}</div><div><strong>${esc(m.person_name||'Interessado')} <span class="match-count">${g.items.length} imóvel${g.items.length===1?'':'is'}</span></strong><span>${esc(regions||'Região não informada')}</span><span class="match-origin-line"><b>${esc(intentSource)}</b> · ${esc(intentDate)}</span></div></div>
       <div class="match-demand"><strong>${esc(m.transaction_type==='rent'?'Alugar':'Comprar')} ${esc(m.desired_property_type||'Imóvel')}</strong><span>Até ${esc(budget)}${Number(m.bedrooms_min||0)?' · '+m.bedrooms_min+'+ dorm.':''}${Number(m.parking_min||0)?' · '+m.parking_min+'+ vagas':''}${Number(m.area_min||0)?' · '+m.area_min+'+ m²':''}</span></div>
-      <div class="match-group-actions">${c?.whatsapp?`<a class="wa-ready" href="${esc(c.whatsapp)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`:''}${safeHttpUrl(m.intent_source_url)?`<a href="${esc(safeHttpUrl(m.intent_source_url))}" target="_blank" rel="noopener noreferrer">Ver intenção ↗</a>`:''}</div>
+      <div class="match-group-actions">${c?.whatsapp?`<a class="wa-ready" href="${esc(safeHttpUrl(c.whatsapp))}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`:''}${safeHttpUrl(m.intent_source_url)?`<a href="${esc(safeHttpUrl(m.intent_source_url))}" target="_blank" rel="noopener noreferrer">Ver intenção ↗</a>`:''}</div>
     </div>
     <div class="match-property-list">${g.items.map(x=>{
       const src=matchSourceName(x.opportunity_source), dt=x.opportunity_published_at?matchDateLabel(x.opportunity_published_at):'data não informada';
@@ -1371,7 +1427,7 @@ function localMatchesHtml(groups){
       <div class="match-property-info"><strong>${propertyMenuHtml(m.owner)}</strong><span>${esc([m.owner.neighborhood,m.owner.city].filter(Boolean).join(' · '))} · ${esc(m.owner.beds||0)} dorm · ${esc(m.owner.parking||0)} vagas</span><span class="match-origin-line"><b>${esc(matchSourceName(m.owner.source))}</b> · ${esc(ownerDisplayDate(m.owner))}</span></div>
       <div class="match-price"><strong>${esc(money(m.owner.price))}</strong></div>
       <div class="match-fit"></div>
-      ${propertyUrl(m.owner)?`<a href="${esc(propertyUrl(m.owner))}" target="_blank" rel="noopener noreferrer">Abrir imóvel ↗</a>`:''}
+      ${propertyUrl(m.owner)?`<a href="${esc(safeHttpUrl(propertyUrl(m.owner)))}" target="_blank" rel="noopener noreferrer">Abrir imóvel ↗</a>`:''}
     </div>`).join('')}</div>
    </article>`;
  }).join('')}</div>`;
@@ -1514,14 +1570,14 @@ function renderDashTop3(rows){
   box.innerHTML=rows.map((o,idx)=>{
     const url=propertyUrl(o),c=ownerContact(o),tx=String(o.transaction_type||'sale').toLowerCase()==='rent'?'LOCAÇÃO':'VENDA',score=dashboardOpportunityRank(o);
     const images=propertyImageCandidates(o);window.LJI_DASH_TOP_IMAGESETS[idx]=images;
-    const media=images.length?`<div class="dash-top-media has-real-image" data-card="${idx}" data-images-count="${images.length}" data-image-index="0"><div class="dash-top-image-placeholder">Imagem do imóvel</div><img src="${esc(images[0])}" alt="${esc(o.title||'Imóvel')}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.remove('has-real-image')"><span class="dash-top-number">0${idx+1}</span>${images.length>1?`<div class="dash-image-dots">${images.map((_,i)=>`<i class="dash-image-dot ${i===0?'active':''}"></i>`).join('')}</div>`:''}</div>`:`<div class="dash-top-media" data-card="${idx}" data-images-count="0"><div class="dash-top-image-placeholder"><span>⌂</span><b>Imagem não disponível na fonte</b></div><span class="dash-top-number">0${idx+1}</span></div>`;
+    const media=images.length?`<div class="dash-top-media has-real-image" data-card="${idx}" data-images-count="${images.length}" data-image-index="0"><div class="dash-top-image-placeholder">Imagem do imóvel</div><img src="${esc(images[0])}" alt="${esc(o.title||'Imóvel')}" loading="lazy" data-lji-image-fallback="Imagem indisponível na fonte"><span class="dash-top-number">0${idx+1}</span>${images.length>1?`<div class="dash-image-dots">${images.map((_,i)=>`<i class="dash-image-dot ${i===0?'active':''}"></i>`).join('')}</div>`:''}</div>`:`<div class="dash-top-media" data-card="${idx}" data-images-count="0"><div class="dash-top-image-placeholder"><span>⌂</span><b>Imagem não disponível na fonte</b></div><span class="dash-top-number">0${idx+1}</span></div>`;
     return `<article class="dash-top-card-modern rank-${idx+1}">${media}<div class="dash-top-content">
       <div class="dash-top-title-row"><h3>${propertyMenuHtml(o)}</h3><div class="dash-score-ring" style="--score:${score}"><strong>${score}</strong><small>score</small></div></div>
       <div class="dash-top-location">⌖ ${esc(o.neighborhood?o.neighborhood+', ':'')}${esc(o.city||'')}</div>
       <div class="dash-top-specs">${Number(o.area||0)?`<span>▣ ${esc(o.area)} m²</span>`:''}${Number(o.beds||0)?`<span>▤ ${esc(o.beds)} dorm.</span>`:''}${Number(o.parking||0)?`<span>▥ ${esc(o.parking)} vagas</span>`:''}</div>
       <div class="dash-top-price">${money(o.price||0)}</div>
       <div class="dash-top-source"><span>${esc(o.source||'Fonte pública')}</span><b>${esc(tx)}</b></div>
-      <div class="dash-top-actions-modern">${url?`<a class="details" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ver detalhes</a>`:'<button class="details" type="button" disabled>Sem link</button>'}${c.wa?`<a class="contact" href="${esc(c.wa)}" target="_blank" rel="noopener noreferrer">◉ Contatar</a>`:c.phone?`<a class="contact" href="tel:+55${esc(c.phone)}">☎ Ligar</a>`:`<button class="contact muted" type="button" onclick="go('contact-check')">Verificar contato</button>`}</div>
+      <div class="dash-top-actions-modern">${url?`<a class="details" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ver detalhes</a>`:'<button class="details" type="button" disabled>Sem link</button>'}${c.wa?`<a class="contact" href="${esc(safeHttpUrl(c.wa))}" target="_blank" rel="noopener noreferrer">◉ Contatar</a>`:c.phone?`<a class="contact" href="tel:+55${esc(c.phone)}">☎ Ligar</a>`:`<button class="contact muted" type="button" onclick="go('contact-check')">Verificar contato</button>`}</div>
     </div></article>`;
   }).join('');
   startDashTopCarousel();
@@ -1547,7 +1603,7 @@ function renderDashboardHotLeads(){
     .filter(o=>o?.is_current&&o?.status!=='rejected'&&ownerContact(o).phone&&!dashboardLooksProfessional(o))
     .sort((a,b)=>dashboardOpportunityRank(b)-dashboardOpportunityRank(a))
     .slice(0,5);
-  box.innerHTML=hot.length?hot.map(o=>{const c=ownerContact(o);const initials=String(o.contact_name||o.title||'IM').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();return `<div class="dash-hot-row"><div class="dash-hot-avatar">${esc(initials)}</div><div><strong>${esc(o.contact_name||o.title||'Oportunidade')}</strong><span>${esc(o.city||'')} · ${esc(o.type||'Imóvel')}</span></div>${c.wa?`<a href="${esc(c.wa)}" target="_blank" rel="noopener noreferrer">◉</a>`:`<a href="tel:+55${esc(c.phone)}">☎</a>`}</div>`}).join(''):'<div class="empty">Nenhum lead atual com telefone confiável disponível.</div>';
+  box.innerHTML=hot.length?hot.map(o=>{const c=ownerContact(o);const initials=String(o.contact_name||o.title||'IM').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();return `<div class="dash-hot-row"><div class="dash-hot-avatar">${esc(initials)}</div><div><strong>${esc(o.contact_name||o.title||'Oportunidade')}</strong><span>${esc(o.city||'')} · ${esc(o.type||'Imóvel')}</span></div>${c.wa?`<a href="${esc(safeHttpUrl(c.wa))}" target="_blank" rel="noopener noreferrer">◉</a>`:`<a href="tel:+55${esc(c.phone)}">☎</a>`}</div>`}).join(''):'<div class="empty">Nenhum lead atual com telefone confiável disponível.</div>';
 }
 function dashboardFilteredRows(){
   const region=document.getElementById('dashRegion')?.value||'',sort=document.getElementById('dashSort')?.value||'recent';
@@ -1607,7 +1663,7 @@ function renderDashboard(){
     const tx=String(o.transaction_type||'sale').toLowerCase()==='rent'?'LOCAÇÃO':'VENDA';
     return `<div class="dash-owner-card">
       <div class="dash-owner-thumb ${safeImageUrl(o.image_url)?'has-image':''}">
-        ${safeImageUrl(o.image_url)?`<img src="${esc(safeImageUrl(o.image_url))}" alt="${esc(o.title||'Imóvel')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.remove('has-image');this.parentElement.textContent='${esc(tx)}'">`:`${esc(tx)}`}
+        ${safeImageUrl(o.image_url)?`<img src="${esc(safeImageUrl(o.image_url))}" alt="${esc(o.title||'Imóvel')}" loading="lazy" referrerpolicy="no-referrer" data-lji-image-fallback="${esc(tx)}">`:`${esc(tx)}`}
         <span class="dash-owner-tx">${esc(tx)}</span>
       </div>
       <div>
@@ -1716,7 +1772,7 @@ function renderTrades(){
   set('tBi',matches.filter(x=>x.bidirectional).length); set('tHot',matches.filter(x=>x.score>=85).length);
   set('tradeNavCount',active.length);
   const intents=document.getElementById('tradeIntentsTable');
-  if(intents) intents.innerHTML=active.length?`<table><thead><tr><th>Imóvel oferecido</th><th>Busca</th><th>Limite</th><th>Observações</th><th></th></tr></thead><tbody>${active.map(i=>{const o=owners.find(x=>String(x.id)===String(i.owner_id));return `<tr><td><strong>${esc(o?.title||'Imóvel removido')}</strong><br><span class="small">${esc(o?.city||'')}</span></td><td>${esc(i.desired_type)} · ${esc(i.desired_city)}<br><span class="small">${esc(i.beds_min)}+ dorm · ${esc(i.parking_min)}+ vagas</span></td><td>${money(i.budget_max)}</td><td>${esc(i.notes||'—')}</td><td><button class="danger" onclick="deleteTradeIntent('${esc(i.id)}')">Excluir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum interesse de permuta cadastrado.</div>';
+  if(intents) intents.innerHTML=active.length?`<table><thead><tr><th>Imóvel oferecido</th><th>Busca</th><th>Limite</th><th>Observações</th><th></th></tr></thead><tbody>${active.map(i=>{const o=owners.find(x=>String(x.id)===String(i.owner_id));return `<tr><td><strong>${esc(o?.title||'Imóvel removido')}</strong><br><span class="small">${esc(o?.city||'')}</span></td><td>${esc(i.desired_type)} · ${esc(i.desired_city)}<br><span class="small">${esc(i.beds_min)}+ dorm · ${esc(i.parking_min)}+ vagas</span></td><td>${money(i.budget_max)}</td><td>${esc(i.notes||'—')}</td><td><button class="danger" ${uiAction('deleteTradeIntent',[i.id],'click')}>Excluir</button></td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Nenhum interesse de permuta cadastrado.</div>';
   const table=document.getElementById('tradeMatchesTable');
   if(table) table.innerHTML=matches.length?`<table><thead><tr><th>Score</th><th>Oferece</th><th>Recebe</th><th>Tipo de oportunidade</th></tr></thead><tbody>${matches.map(m=>`<tr><td><span class="badge ${m.score>=85?'hot':m.score>=70?'good':'mid'}">${m.score>=85?'🔥 ':''}${m.score}%</span></td><td><strong>${propertyMenuHtml(m.offered)}</strong><br><span class="small">${esc(m.offered.city)} · ${money(m.offered.price)}</span></td><td><strong>${propertyMenuHtml(m.candidate)}</strong><br><span class="small">${esc(m.candidate.city)} · ${money(m.candidate.price)}</span></td><td><span class="badge ${m.bidirectional?'hot':'good'}">${m.bidirectional?'🔁 Bidirecional':'Compatível'}</span></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Sem matches ainda. Cadastre interesses de permuta.</div>';
 }
@@ -1764,7 +1820,7 @@ function renderCompanies(){
   if(table){
     if(!active.length){table.innerHTML='<div class="empty">Nenhuma demanda corporativa cadastrada.</div>';}
     else{
-      const tableRows=active.map(c=>`<tr><td><strong>${esc(c.name)}</strong><br><span class="small">${esc(c.contact||'Sem contato')}</span></td><td>${esc(c.type)} · ${esc(c.city||'Região aberta')}<br><span class="small">${c.area_min?esc(c.area_min)+' m² mín. · ':''}${c.floors_min?esc(c.floors_min)+' andares mín. · ':''}${esc(c.notes||'')}</span></td><td>${money(c.budget)}</td><td><span class="badge ${c.urgency===3?'hot':c.urgency===2?'good':'mid'}">${c.urgency===3?'Alta':c.urgency===2?'Média':'Baixa'}</span></td><td>${esc(c.source)}</td><td><button class="danger" onclick="deleteCompanyDemand('${esc(c.id)}')">Excluir</button></td></tr>`).join('');
+      const tableRows=active.map(c=>`<tr><td><strong>${esc(c.name)}</strong><br><span class="small">${esc(c.contact||'Sem contato')}</span></td><td>${esc(c.type)} · ${esc(c.city||'Região aberta')}<br><span class="small">${c.area_min?esc(c.area_min)+' m² mín. · ':''}${c.floors_min?esc(c.floors_min)+' andares mín. · ':''}${esc(c.notes||'')}</span></td><td>${money(c.budget)}</td><td><span class="badge ${c.urgency===3?'hot':c.urgency===2?'good':'mid'}">${c.urgency===3?'Alta':c.urgency===2?'Média':'Baixa'}</span></td><td>${esc(c.source)}</td><td><button class="danger" ${uiAction('deleteCompanyDemand',[c.id],'click')}>Excluir</button></td></tr>`).join('');
       const cards=active.map(c=>{
         const urg=c.urgency===3?'Alta':c.urgency===2?'Média':'Baixa';
         const urgCls=c.urgency===3?'hot':c.urgency===2?'good':'mid';
@@ -1776,7 +1832,7 @@ function renderCompanies(){
           <div class="m-card-specs">${esc(specs||'Sem requisitos extras')}</div>
           <div class="m-card-row small">${esc(c.contact||'Sem contato')} · ${esc(c.source||'')}</div>
           ${c.notes?`<div class="m-card-row small">${esc(c.notes)}</div>`:''}
-          <div class="m-card-actions"><button class="danger" type="button" onclick="deleteCompanyDemand('${esc(c.id)}')">Excluir</button></div>
+          <div class="m-card-actions"><button class="danger" type="button" ${uiAction('deleteCompanyDemand',[c.id],'click')}>Excluir</button></div>
         </article>`;
       }).join('');
       table.innerHTML=`<div class="desktop-table-wrap"><table><thead><tr><th>Empresa / grupo</th><th>Demanda</th><th>Orçamento</th><th>Urgência</th><th>Origem</th><th></th></tr></thead><tbody>${tableRows}</tbody></table></div><div class="mobile-card-list">${cards}</div>`;
@@ -1831,7 +1887,7 @@ function renderReports(){
     ['Matches corporativos',corpMatches.length,'companies']
   ];
   const f=document.getElementById('rFunnel');
-  if(f)f.innerHTML=funnel.map(([k,v,page])=>`<button class="report-funnel-link" onclick="go('${page}')">
+  if(f)f.innerHTML=funnel.map(([k,v,page])=>`<button class="report-funnel-link" ${uiAction('go',[page],'click')}>
     <span><strong>${k}</strong><small>Clique para abrir o módulo</small></span>
     <span class="report-funnel-count">${v}</span><b>›</b>
   </button>`).join('');
@@ -1975,7 +2031,7 @@ function renderIntentions(){
       <div class="intent-wants"><strong>${esc(intentActionLabel(i))} ${esc(i._type)}</strong><span>${intentRole(i)==='seller'?'<b class="seller-intent-tag">Proprietário</b> · ':''}${specs||'Perfil aberto'}</span></div>
       <div class="intent-location"><small>${intentRole(i)==='seller'?'Local do imóvel':'Região'}</small><strong>${esc(i._location)}</strong></div>
       <div class="intent-budget"><small>${esc(intentValueLabel(i))}</small><strong>${Number(i.budget_max||0)?esc(money(i.budget_max)):'Não informado'}</strong></div>
-      <div class="intent-contact"><small>Contato</small>${c?(c.whatsapp?`<a class="intent-whatsapp" href="${esc(c.whatsapp)}" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>`:`<strong>${esc(c.raw)}</strong><span>DDD não informado</span>`):(i.raw_snapshot?.contact_verified?'<span>Celular verificado · número não exposto</span>':'<span>Via fonte</span>')}</div>
+      <div class="intent-contact"><small>Contato</small>${c?(c.whatsapp?`<a class="intent-whatsapp" href="${esc(safeHttpUrl(c.whatsapp))}" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>`:`<strong>${esc(c.raw)}</strong><span>DDD não informado</span>`):(i.raw_snapshot?.contact_verified?'<span>Celular verificado · número não exposto</span>':'<span>Via fonte</span>')}</div>
       <div class="intent-score"><span class="badge ${Number(i.intent_score)>=80?'hot':Number(i.intent_score)>=60?'good':'mid'}">${Number(i.intent_score||0)}%</span>${i.status==='active'?'<small>Ativa</small>':'<small>Histórico</small>'}</div>
       <div class="intent-action">${safeHttpUrl(i.source_url)?`<a class="source-action" href="${esc(safeHttpUrl(i.source_url))}" target="_blank" rel="noopener noreferrer">Abrir origem ↗</a>`:'<span class="small">Sem link</span>'}</div>
     </article>`;
@@ -2299,8 +2355,8 @@ function renderContactCheck(){
   const best=g.best?`<a class="contact-btn phone" href="tel:+55${esc(g.best.digits)}">${esc(g.best.raw||g.best.digits)}</a>${g.best.isMobile?` <a class="contact-btn whatsapp" href="https://wa.me/55${esc(g.best.digits)}" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>`:''}`:'<span class="small">Sem telefone capturado</span>';
   const loc=[g.neighborhood,g.city].filter(Boolean).join(' — ')||'Localização não informada';
   const addr=(g.address||g.cep)?`<div class="small">${esc(g.address||'')}${g.address&&g.cep?' · ':''}${esc(g.cep||'')}</div>`:'';
-  const options=g.phones.length>1?`<div class="small" style="margin-top:6px">Outras opções: ${g.phones.map(ph=>`<button class="secondary" style="margin:2px" onclick="setContactOverride('${g.id}','${ph.digits}')">${esc(ph.raw||ph.digits)} (${ph.sources.length} fonte${ph.sources.length===1?'':'s'})</button>`).join(' ')}</div>`:'';
-  const confirm=g.best&&g.status!=='verificado_manual'?`<button class="contact-confirm-btn" onclick="confirmContactManually('${g.id}')">✓ Confirmar telefone</button>`:'';
+  const options=g.phones.length>1?`<div class="small" style="margin-top:6px">Outras opções: ${g.phones.map(ph=>`<button class="secondary" style="margin:2px" ${uiAction('setContactOverride',[g.id,ph.digits],'click')}>${esc(ph.raw||ph.digits)} (${ph.sources.length} fonte${ph.sources.length===1?'':'s'})</button>`).join(' ')}</div>`:'';
+  const confirm=g.best&&g.status!=='verificado_manual'?`<button class="contact-confirm-btn" ${uiAction('confirmContactManually',[g.id],'click')}>✓ Confirmar telefone</button>`:'';
   const list=g.members.map(m=>{const u=safeHttpUrl(m.url);return `<li>${esc(m.kind)} · ${esc(m.source||'—')}${u?` · <a href="${esc(u)}" target="_blank" rel="noopener noreferrer">abrir origem ↗</a>`:''}</li>`}).join('');
   return `<div class="card" style="margin-bottom:12px"><div class="section-head"><h3>${esc(g.name||g.title||'Lead sem nome')}</h3>${badge}</div><div class="small">${esc(loc)}</div>${addr}<div class="contact-check-actions">${best}${confirm}</div>${options}<details style="margin-top:8px"><summary class="small">${g.members.length} ocorrência(s) interligada(s)</summary><ul class="small">${list}</ul></details></div>`;
  }).join('')
@@ -2594,7 +2650,7 @@ function renderParaQuintoAndar(){
    <td><span class="publication-date">${esc(publicationValue(x.date))}</span></td>
    <td>${x.whatsapp?`<a class="wa-ready" href="${esc(x.whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>`:x.phone?`<a class="contact-btn phone" href="tel:+55${esc(x.phone)}">Ligar</a>`:'<span class="contact-needs-review">Sem contato · buscar</span>'}</td>
    <td>${x.sourceUrls.length?x.sourceUrls.map((u,i)=>`<a class="source-action" href="${esc(u)}" target="_blank" rel="noopener">Origem ${i+1} ↗</a>`).join(' '):'—'}</td>
-   <td><button class="lead-discard" title="Descartar — não volta a aparecer" onclick="discardLead('${esc(x.id)}')">Descartar</button></td>
+   <td><button class="lead-discard" title="Descartar — não volta a aparecer" ${uiAction('discardLead',[x.id],'click')}>Descartar</button></td>
   </tr>`;
  }).join('')}</tbody></table>`;
 }
@@ -2639,7 +2695,7 @@ function renderWhatsAppLeads(){
   <td><span class="publication-date">${esc(publicationValue(x.date))}</span></td><td>${qaStatusHtml(x.qaStatus,x.qaMatchUrl)}</td>
   <td>${contactCell(x)}</td>
   <td>${sourceLinks(x)}</td>
-  <td><button class="lead-discard" title="Descartar — não volta a aparecer" onclick="discardLead('${esc(x.id)}')">Descartar</button></td>
+  <td><button class="lead-discard" title="Descartar — não volta a aparecer" ${uiAction('discardLead',[x.id],'click')}>Descartar</button></td>
  </tr>`).join('');
  const cards=rows.map(x=>`<article class="m-card ${x.leadState==='historical'?'m-card-muted':''}">
    <div class="m-card-top">
@@ -2653,7 +2709,7 @@ function renderWhatsAppLeads(){
    <div class="m-card-actions m-card-actions-primary">${contactCell(x)} ${sourceLinks(x)}</div>
    <div class="m-card-actions m-card-select">
      <label class="sel-label"><input type="checkbox" class="lead-check" data-scope="Wa" data-lead-id="${esc(x.id)}" onchange="ljiUpdateSelectionBar('Wa')"> Selecionar</label>
-     <button class="lead-discard" onclick="discardLead('${esc(x.id)}')">Descartar</button>
+     <button class="lead-discard" ${uiAction('discardLead',[x.id],'click')}>Descartar</button>
    </div>
  </article>`).join('');
  box.innerHTML=`<div class="desktop-table-wrap"><table><thead><tr><th class="sel-col"><input type="checkbox" id="selAllWa" onchange="ljiToggleAll('Wa',this.checked)" title="Selecionar todos"></th><th>Status</th><th>Lead</th><th>Módulo(s)</th><th>Imóvel / procura</th><th>Região</th><th>Origem</th><th>Telefone</th><th>Data de publicação</th><th>QuintoAndar</th><th>Contato</th><th>Fonte</th><th></th></tr></thead><tbody>${tableRows}</tbody></table></div><div class="mobile-card-list">${cards}</div>`;
@@ -2891,10 +2947,10 @@ function filteredActionCenter(){
   return actionCenterCache.filter(a=>(!type||a.type===type)&&(!priority||a.priority===priority)&&(!q||[a.title,a.subtitle,a.reason,a.source,a.actionLabel].join(' ').toLowerCase().includes(q)));
 }
 function actionPrimaryHtml(a){
-  if(a.primaryHref)return `<a class="action-primary" href="${esc(safeHttpUrl(a.primaryHref)||a.primaryHref)}" target="_blank" rel="noopener noreferrer">${esc(a.actionLabel)} →</a>`;
+  if(a.primaryHref)return `<a class="action-primary" href="${esc(safeHttpUrl(a.primaryHref))}" target="_blank" rel="noopener noreferrer">${esc(a.actionLabel)} →</a>`;
   if(a.primaryTel)return `<a class="action-primary" href="${esc(a.primaryTel)}">${esc(a.actionLabel)} →</a>`;
-  if(a.primaryGo)return `<button class="action-primary" type="button" onclick="openActionDestination('${esc(a.primaryGo)}','${esc(a.ownerId||'')}')">${esc(a.actionLabel)} →</button>`;
-  return `<button class="action-primary" type="button" onclick="go('${esc(a.secondaryGo||'dashboard')}')">${esc(a.actionLabel)} →</button>`;
+  if(a.primaryGo)return `<button class="action-primary" type="button" ${uiAction('openActionDestination',[a.primaryGo,a.ownerId||''],'click')}>${esc(a.actionLabel)} →</button>`;
+  return `<button class="action-primary" type="button" ${uiAction('go',[a.secondaryGo||'dashboard'],'click')}>${esc(a.actionLabel)} →</button>`;
 }
 function openActionDestination(page,ownerId){
   go(page);
@@ -2929,7 +2985,7 @@ function renderActionCenter(){
       <div class="action-reason"><b>Por quê:</b> ${esc(a.reason)}</div>
       <div class="action-meta"><span>${esc(a.freshness)}</span><span>${esc(a.source||'Radar')}</span></div>
     </div>
-    <div class="action-actions">${actionPrimaryHtml(a)}${a.secondaryGo?`<button class="action-secondary" type="button" onclick="openActionDestination('${esc(a.secondaryGo)}','${esc(a.ownerId||'')}')">Ver contexto</button>`:''}</div>
+    <div class="action-actions">${actionPrimaryHtml(a)}${a.secondaryGo?`<button class="action-secondary" type="button" ${uiAction('openActionDestination',[a.secondaryGo,a.ownerId||''],'click')}>Ver contexto</button>`:''}</div>
   </article>`).join('');
 }
 async function refreshActionCenterNow(){
@@ -3106,7 +3162,7 @@ function pipeline360Html(lead){
   const intel=pipelineCommercialIntel(lead),events=pipelineEntityEvents(lead.entityType,lead.entityId);
   const priority=intel.priority==='high'?'Alta':intel.priority==='medium'?'Média':'Baixa';
   const timeline=events.length?events.map(e=>`<div class="sales360-event"><div><b>${esc(pipelineEventLabel(e))}</b><span>${esc(fmtDateTime(e.created_at))}</span></div>${e.details?.note?`<p>${esc(e.details.note)}</p>`:''}${e.details?.analysis_summary?`<p>${esc(e.details.analysis_summary)}</p>`:''}${e.details?.recommended_action?`<p><b>Próxima ação:</b> ${esc(e.details.recommended_action)}</p>`:''}${e.details?.loss_reason?`<p>Motivo da perda: ${esc(e.details.loss_reason)}</p>`:''}<small>${esc(e.details?.changed_by_name||e.details?.author_name||'Equipe LJ')}</small></div>`).join(''):'<div class="empty">Ainda não há memória comercial registrada para este lead.</div>';
-  return `<div class="sales360-grid"><section><div class="sales360-hero"><span>${esc(lead.leadType)}</span><h2>${esc(lead.title)}</h2><p>${esc(lead.subtitle)} · ${esc(lead.region)}</p></div><div class="sales360-facts"><div><span>Score comercial</span><b>${intel.score}/100</b></div><div><span>Prioridade</span><b>${priority}</b></div><div><span>Etapa</span><b>${esc(pipelineStageMeta(lead.stage).label)}</b></div><div><span>Responsável</span><b>${esc(lead.handledByName||'Não atribuído')}</b></div></div><div class="pipeline-intel"><div class="pipeline-intel-head"><b>Próxima melhor ação</b><span>${intel.score}</span></div><div class="pipeline-intel-action">${esc(intel.action)}</div><div class="pipeline-intel-reason">${esc(intel.reasons.join(' · '))}</div></div><div class="sales360-compose"><textarea id="sales360Note" maxlength="1200" placeholder="Registre o que aconteceu: necessidade, objeção, condição, próximo passo..."></textarea><div><select id="sales360Channel"><option value="Nota">Nota interna</option><option value="WhatsApp">WhatsApp</option><option value="Ligação">Ligação</option><option value="E-mail">E-mail</option><option value="Visita">Visita</option></select><button class="primary" onclick="saveSales360Activity('${esc(lead.entityType)}','${esc(lead.entityId)}')">Salvar na memória</button></div></div></section><section><div class="section-head"><div><h3>Memória comercial</h3><span class="small">Histórico real e permanente do atendimento</span></div><span class="badge good">${events.length}</span></div><div class="sales360-timeline">${timeline}</div></section></div>`;
+  return `<div class="sales360-grid"><section><div class="sales360-hero"><span>${esc(lead.leadType)}</span><h2>${esc(lead.title)}</h2><p>${esc(lead.subtitle)} · ${esc(lead.region)}</p></div><div class="sales360-facts"><div><span>Score comercial</span><b>${intel.score}/100</b></div><div><span>Prioridade</span><b>${priority}</b></div><div><span>Etapa</span><b>${esc(pipelineStageMeta(lead.stage).label)}</b></div><div><span>Responsável</span><b>${esc(lead.handledByName||'Não atribuído')}</b></div></div><div class="pipeline-intel"><div class="pipeline-intel-head"><b>Próxima melhor ação</b><span>${intel.score}</span></div><div class="pipeline-intel-action">${esc(intel.action)}</div><div class="pipeline-intel-reason">${esc(intel.reasons.join(' · '))}</div></div><div class="sales360-compose"><textarea id="sales360Note" maxlength="1200" placeholder="Registre o que aconteceu: necessidade, objeção, condição, próximo passo..."></textarea><div><select id="sales360Channel"><option value="Nota">Nota interna</option><option value="WhatsApp">WhatsApp</option><option value="Ligação">Ligação</option><option value="E-mail">E-mail</option><option value="Visita">Visita</option></select><button class="primary" ${uiAction('saveSales360Activity',[lead.entityType,lead.entityId],'click')}>Salvar na memória</button></div></div></section><section><div class="section-head"><div><h3>Memória comercial</h3><span class="small">Histórico real e permanente do atendimento</span></div><span class="badge good">${events.length}</span></div><div class="sales360-timeline">${timeline}</div></section></div>`;
 }
 function openLead360(type,id){
   const lead=pipelineEntities().find(x=>x.entityType===type&&String(x.entityId)===String(id));if(!lead){toast('Lead não encontrado.');return}
@@ -3125,7 +3181,7 @@ async function saveSales360Activity(type,id){
 window.openLead360=openLead360;window.closeLead360=closeLead360;window.saveSales360Activity=saveSales360Activity;
 
 function pipelineStageOptions(current){return LJI_PIPELINE_STAGES.map(s=>`<option value="${esc(s.key)}" ${s.key===current?'selected':''}>${esc(s.label)}</option>`).join('')}
-function pipelineContextButton(x){return `<button type="button" class="pipeline-context" onclick="openLead360('${esc(x.entityType)}','${esc(x.entityId)}')">Lead 360°</button>`}
+function pipelineContextButton(x){return `<button type="button" class="pipeline-context" ${uiAction('openLead360',[x.entityType,x.entityId],'click')}>Lead 360°</button>`}
 function pipelineContactButton(x){
   if(x.contactHref)return `<a class="pipeline-contact" href="${esc(safeHttpUrl(x.contactHref)||x.contactHref)}" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>`;
   if(x.contactTel)return `<a class="pipeline-contact" href="${esc(x.contactTel)}">Ligar</a>`;
@@ -3137,7 +3193,7 @@ function pipelineCardHtml(x){
   const owner=x.handledByName?esc(x.handledByName):'Sem responsável';
   const intel=pipelineCommercialIntel(x),priorityLabel=intel.priority==='high'?'ALTA':intel.priority==='medium'?'MÉDIA':'BAIXA';
   const intelBox=`<div class="pipeline-intel"><div class="pipeline-intel-head"><b>Próxima melhor ação</b><span>${priorityLabel} · ${intel.score}</span></div><div class="pipeline-intel-action">${esc(intel.action)}</div><div class="pipeline-intel-reason">${esc(intel.reasons.length?intel.reasons.join(' · '):'score baseado nos dados disponíveis')}</div></div>`;
-  const follow=pipelineFollowUpIntel(x),followBox=!['won','lost'].includes(x.stage)?`<div class="pipeline-followup pipeline-followup-${follow.level}"><div><b>${esc(follow.message)}</b><small>${follow.days===null?'Sem interação registrada':`Última movimentação há ${follow.days} dia${follow.days===1?'':'s'}`}</small></div>${follow.due?`<button type="button" onclick="copyPipelineFollowUp('${esc(x.entityType)}','${esc(x.entityId)}')">Copiar abordagem</button>`:''}</div>`:'';
+  const follow=pipelineFollowUpIntel(x),followBox=!['won','lost'].includes(x.stage)?`<div class="pipeline-followup pipeline-followup-${follow.level}"><div><b>${esc(follow.message)}</b><small>${follow.days===null?'Sem interação registrada':`Última movimentação há ${follow.days} dia${follow.days===1?'':'s'}`}</small></div>${follow.due?`<button type="button" ${uiAction('copyPipelineFollowUp',[x.entityType,x.entityId],'click')}>Copiar abordagem</button>`:''}</div>`:'';
   return `<article class="pipeline-card pipeline-priority-${intel.priority} ${x.stage==='won'?'pipeline-card-won':x.stage==='lost'?'pipeline-card-lost':''}">
     <div class="pipeline-card-head"><span class="pipeline-type">${esc(x.leadType)}</span><span class="pipeline-score">${intel.score}</span></div>
     <strong class="pipeline-card-title">${esc(x.title)}</strong>
@@ -3147,7 +3203,7 @@ function pipelineCardHtml(x){
     ${intelBox}
     ${followBox}
     <div class="pipeline-owner">${esc(owner)}</div>
-    <div class="pipeline-stage-change"><select aria-label="Etapa comercial" onchange="setPipelineStage('${esc(x.entityType)}','${esc(x.entityId)}',this.value,this)">${pipelineStageOptions(x.stage)}</select><small>${esc(changed)}</small></div>
+    <div class="pipeline-stage-change"><select aria-label="Etapa comercial" ${uiAction('setPipelineStage',[x.entityType,x.entityId],'change')}>${pipelineStageOptions(x.stage)}</select><small>${esc(changed)}</small></div>
     <div class="pipeline-card-actions">${pipelineContactButton(x)}${pipelineContextButton(x)}</div>
   </article>`;
 }
@@ -3238,7 +3294,7 @@ function propertyMenuHtml(o){
  const url=propertyUrl(o),title=esc(o?.title||'Imóvel');
  return `<span class="property-link-wrap">
   ${url?`<a class="property-link-trigger" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${title}</a>`:`<span style="font-weight:800">${title}</span>`}
-  <button type="button" class="property-more-btn" onclick="openPropertyMenu(event,'${esc(o?.id)}')" title="Mais ações">⋯</button>
+  <button type="button" class="property-more-btn" ${uiAction('openPropertyMenu',[o?.id],'click')} title="Mais ações">⋯</button>
  </span>`;
 }
 function propertyUrlById(id){
@@ -3254,12 +3310,12 @@ function openPropertyMenu(ev,id){
  const canPrioritize=['super_admin','gestor'].includes(window.LJI_CURRENT_USER?.role||'')&&o.opportunity_id&&o.is_current;
  pop.innerHTML=`<div class="pop-title">${esc(o.title||'Imóvel')}</div>
   ${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">↗ Abrir anúncio original</a>`:`<button onclick="toast('Este imóvel ainda não tem link de origem cadastrado.')">↗ Link original indisponível</button>`}
-  ${c.wa?`<a href="${esc(c.wa)}" target="_blank" rel="noopener noreferrer">◉ WhatsApp do proprietário${c.verified?' · confirmado':''}</a>`:''}
+  ${c.wa?`<a href="${esc(safeHttpUrl(c.wa))}" target="_blank" rel="noopener noreferrer">◉ WhatsApp do proprietário${c.verified?' · confirmado':''}</a>`:''}
   ${c.phone?`<a href="tel:+55${esc(c.phone)}">☎ Ligar para proprietário</a>`:''}
-  <button onclick="document.getElementById('propertyPopover')?.classList.remove('open');openRegistryForProperty('${esc(o.id)}')">⌂ Pesquisa registral / titularidade</button>
-  ${url?`<button onclick="copyPropertyLink('${esc(o.id)}')">⧉ Copiar link</button>`:''}
-  ${canPrioritize?(o.status==='hot'?`<button onclick="setOwnerRadarStatus('${esc(o.opportunity_id)}','approved')">🔥 Remover prioridade</button>`:`<button onclick="setOwnerRadarStatus('${esc(o.opportunity_id)}','hot')">🔥 Marcar quente</button>`):''}
-  ${canPrioritize?`<button class="danger" onclick="if(confirm('Descartar este imóvel? Ele some das telas gerais.'))setOwnerRadarStatus('${esc(o.opportunity_id)}','rejected')">🗑 Descartar este imóvel</button>`:''}`;
+  <button ${uiAction('registryFromMenu',[o.id],'click')}>⌂ Pesquisa registral / titularidade</button>
+  ${url?`<button ${uiAction('copyPropertyLink',[o.id],'click')}>⧉ Copiar link</button>`:''}
+  ${canPrioritize?(o.status==='hot'?`<button ${uiAction('setOwnerRadarStatus',[o.opportunity_id,'approved'],'click')}>🔥 Remover prioridade</button>`:`<button ${uiAction('setOwnerRadarStatus',[o.opportunity_id,'hot'],'click')}>🔥 Marcar quente</button>`):''}
+  ${canPrioritize?`<button class="danger" ${uiAction('rejectOwner',[o.opportunity_id],'click')}>🗑 Descartar este imóvel</button>`:''}`;
  const r=ev.currentTarget.getBoundingClientRect();
  pop.style.left=Math.min(r.left,window.innerWidth-320)+'px';
  pop.style.top=Math.min(r.bottom+8,window.innerHeight-220)+'px';
@@ -3277,9 +3333,9 @@ function alertRowHtml(a){
     </div>
     <div class="alert-row-actions">
       ${wa?`<a href="${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>`:''}
-      ${o.source_url?`<a href="${esc(o.source_url)}" target="_blank" rel="noopener">Abrir imóvel ↗</a>`:''}
-      ${a.alert_status==='new'?`<button onclick="markAlertSeen('${a.id}')">Marcar visto</button>`:''}
-      <button class="danger" onclick="dismissAlert('${a.id}')">Dispensar</button>
+      ${o.source_url?`<a href="${esc(safeHttpUrl(o.source_url))}" target="_blank" rel="noopener">Abrir imóvel ↗</a>`:''}
+      ${a.alert_status==='new'?`<button ${uiAction('markAlertSeen',[a.id],'click')}>Marcar visto</button>`:''}
+      <button class="danger" ${uiAction('dismissAlert',[a.id],'click')}>Dispensar</button>
     </div>
   </div>`;
 }
@@ -3542,7 +3598,7 @@ function renderSalesActionQueue(){
   const root=document.getElementById('salesActionQueue');if(!root)return;const h=salesQueueHours(),a=document.getElementById('salesQueueStart'),b=document.getElementById('salesQueueEnd');if(a&&document.activeElement!==a)a.value=h.start;if(b&&document.activeElement!==b)b.value=h.end;
   const latest=salesActionLatestMap(),rows=pipelineEntities().filter(x=>{const e=latest.get(pipelineKey(x.entityType,x.entityId));return e&&['queued','approved'].includes(salesActionStatus(e))&&!['won','lost'].includes(x.stage)}).map(x=>({lead:x,event:latest.get(pipelineKey(x.entityType,x.entityId))}));
   const count=document.getElementById('salesQueueCount');if(count)count.textContent=String(rows.length);if(!rows.length){root.innerHTML='<div class="empty">Nenhuma ação aguardando aprovação ou execução.</div>';return}
-  rows.sort((x,y)=>pipelineCommercialIntel(y.lead).score-pipelineCommercialIntel(x.lead).score);root.innerHTML=rows.map(({lead,event})=>{const st=salesActionStatus(event),f=pipelineFollowUpIntel(lead),label=st==='approved'?'Aprovada':'Aguardando aprovação';return `<div class="sales-queue-row sales-queue-${esc(st)}"><div><span class="sales-queue-status">${esc(label)}</span><small>${esc(pipelineStageMeta(lead.stage).label)}</small></div><div><strong>${esc(lead.title)}</strong><small>${esc(lead.region)} · score ${pipelineCommercialIntel(lead).score}</small></div><div class="sales-queue-message">${esc(f.script)}</div><div class="sales-queue-actions">${st==='queued'?`<button class="primary" onclick="approveSalesAction('${esc(lead.entityType)}','${esc(lead.entityId)}')">Aprovar</button>`:`<button class="primary" onclick="completeSalesAction('${esc(lead.entityType)}','${esc(lead.entityId)}')">Concluir</button>`}<button class="secondary" onclick="copySalesQueueMessage('${esc(lead.entityType)}','${esc(lead.entityId)}')">Copiar</button><button class="secondary" onclick="cancelSalesAction('${esc(lead.entityType)}','${esc(lead.entityId)}')">Cancelar</button></div></div>`}).join('');
+  rows.sort((x,y)=>pipelineCommercialIntel(y.lead).score-pipelineCommercialIntel(x.lead).score);root.innerHTML=rows.map(({lead,event})=>{const st=salesActionStatus(event),f=pipelineFollowUpIntel(lead),label=st==='approved'?'Aprovada':'Aguardando aprovação';return `<div class="sales-queue-row sales-queue-${esc(st)}"><div><span class="sales-queue-status">${esc(label)}</span><small>${esc(pipelineStageMeta(lead.stage).label)}</small></div><div><strong>${esc(lead.title)}</strong><small>${esc(lead.region)} · score ${pipelineCommercialIntel(lead).score}</small></div><div class="sales-queue-message">${esc(f.script)}</div><div class="sales-queue-actions">${st==='queued'?`<button class="primary" ${uiAction('approveSalesAction',[lead.entityType,lead.entityId],'click')}>Aprovar</button>`:`<button class="primary" ${uiAction('completeSalesAction',[lead.entityType,lead.entityId],'click')}>Concluir</button>`}<button class="secondary" ${uiAction('copySalesQueueMessage',[lead.entityType,lead.entityId],'click')}>Copiar</button><button class="secondary" ${uiAction('cancelSalesAction',[lead.entityType,lead.entityId],'click')}>Cancelar</button></div></div>`}).join('');
 }
 Object.assign(window,{prepareSalesActionQueue,approveSalesAction,completeSalesAction,cancelSalesAction,copySalesQueueMessage,renderSalesActionQueue,saveSalesQueueHours});
 
@@ -3646,11 +3702,11 @@ function renderSalesInbox(){
  const unread=salesInboxEvents().filter(e=>e.event_type==='whatsapp_message_received'&&!e.details?.read_at).length;
  const pending=(window.LJI_ADMIN_STATE?.pipelineEvents||[]).filter(e=>e.event_type==='sales_action_approved').length-(window.LJI_ADMIN_STATE?.pipelineEvents||[]).filter(e=>['sales_action_completed','sales_action_cancelled'].includes(e.event_type)).length;
  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};set('inboxThreads',threads.length);set('inboxUnread',unread);set('inboxPending',Math.max(0,pending));set('inboxChannel',salesInboxEvents().length?'Ativo':'Aguardando');set('salesInboxNavCount',unread||'');set('inboxUpdatedAt',`Atualizado ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
- const box=document.getElementById('salesInboxThreads');if(box)box.innerHTML=visible.length?visible.map(t=>`<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" onclick="openSalesInboxThread('${esc(t.phone)}')"><strong>${esc(t.name||('+'+t.phone))}</strong><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>';
+ const box=document.getElementById('salesInboxThreads');if(box)box.innerHTML=visible.length?visible.map(t=>`<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" ${uiAction('openSalesInboxThread',[t.phone],'click')}><strong>${esc(t.name||('+'+t.phone))}</strong><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>';
  if(window.LJI_SALES_INBOX_SELECTED)openSalesInboxThread(window.LJI_SALES_INBOX_SELECTED,dir);
 }
 function openSalesInboxThread(phone,forcedDir){window.LJI_SALES_INBOX_SELECTED=String(phone);const t=salesInboxThreads().find(x=>x.phone===String(phone));if(!t)return;const dir=forcedDir??(document.getElementById('inboxDirection')?.value||'');const events=t.events.filter(e=>!dir||(dir==='inbound'?e.event_type==='whatsapp_message_received':e.event_type!=='whatsapp_message_received'));const sel=document.getElementById('salesInboxSelected');if(sel)sel.textContent=`${t.name||'Contato'} · +${t.phone}`;const box=document.getElementById('salesInboxMessages');if(box)box.innerHTML=events.length?events.map(e=>`<div class="sales-inbox-message ${e.event_type==='whatsapp_message_received'?'inbound':'outbound'}"><span>${esc(e.details?.text||'[mensagem sem texto]')}</span><small>${new Date(e.created_at).toLocaleString('pt-BR')} · ${e.event_type==='whatsapp_message_failed'?'falha':e.event_type==='whatsapp_message_received'?'recebida':'enviada'}</small></div>`).join(''):'<div class="empty">Nenhuma mensagem neste filtro.</div>';document.getElementById('salesInboxComposer')?.classList.remove('hidden');renderSalesInboxThreadsOnly()}
-function renderSalesInboxThreadsOnly(){const box=document.getElementById('salesInboxThreads');if(!box)return;const q=(document.getElementById('inboxSearch')?.value||'').toLowerCase().trim();const visible=salesInboxThreads().filter(t=>!q||[t.name,t.phone,...t.events.map(e=>e.details?.text||'')].join(' ').toLowerCase().includes(q));box.innerHTML=visible.length?visible.map(t=>`<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" onclick="openSalesInboxThread('${esc(t.phone)}')"><strong>${esc(t.name||('+'+t.phone))}</strong><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>'}
+function renderSalesInboxThreadsOnly(){const box=document.getElementById('salesInboxThreads');if(!box)return;const q=(document.getElementById('inboxSearch')?.value||'').toLowerCase().trim();const visible=salesInboxThreads().filter(t=>!q||[t.name,t.phone,...t.events.map(e=>e.details?.text||'')].join(' ').toLowerCase().includes(q));box.innerHTML=visible.length?visible.map(t=>`<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" ${uiAction('openSalesInboxThread',[t.phone],'click')}><strong>${esc(t.name||('+'+t.phone))}</strong><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>'}
 async function refreshSalesInbox(){try{await window.LJI_BACKEND?.syncAdmin?.();renderSalesInbox();toast('Inbox atualizado.')}catch(e){console.error(e);toast('Falha ao atualizar Inbox.')}}
 function inboxLeadByPhone(){const phone=window.LJI_SALES_INBOX_SELECTED;if(!phone)return null;return pipelineEntities().find(x=>{const p=String(x.contactHref||x.contactTel||'').replace(/\D/g,'');return p&&phone.endsWith(p.slice(-10))})||null}
 async function draftInboxWithAgent(){const lead=inboxLeadByPhone();if(!lead){toast('Contato ainda não está vinculado a um lead do Pipeline.');return}go('pipeline');setTimeout(()=>{const sel=document.getElementById('salesAgentLead');if(sel){sel.value=pipelineKey(lead.entityType,lead.entityId);renderSalesAgentContext();document.getElementById('salesAgentGoal').value='next';generateSalesAgentDraft()}},80)}
@@ -3714,7 +3770,7 @@ salesAgentRecentMemory=function(lead){
 function ljiRenderInboxThreadsList(threads,q){
   const box=document.getElementById('salesInboxThreads');if(!box)return;
   const visible=threads.filter(t=>!q||[t.name,t.phone,...t.events.map(e=>e.details?.text||'')].join(' ').toLowerCase().includes(q));
-  box.innerHTML=visible.length?visible.map(t=>{const lead=ljiInboxLinkedLead(t.phone),a=ljiInboxAnalysis(t.phone,lead),unread=ljiInboxUnreadForThread(t);return `<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" onclick="openSalesInboxThread('${esc(t.phone)}')"><div class="sales-inbox-thread-top"><strong>${esc(t.name||('+'+t.phone))}</strong>${unread?`<b class="inbox-unread-pill">${unread}</b>`:''}</div><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${lead?`Vinculado: ${esc(lead.title)}`:'Não vinculado'}${a?.details?.intent_level?` · ${esc(ljiInboxIntentLabel(a.details.intent_level))}`:''}</small><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`}).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>';
+  box.innerHTML=visible.length?visible.map(t=>{const lead=ljiInboxLinkedLead(t.phone),a=ljiInboxAnalysis(t.phone,lead),unread=ljiInboxUnreadForThread(t);return `<button class="sales-inbox-thread ${window.LJI_SALES_INBOX_SELECTED===t.phone?'active':''}" ${uiAction('openSalesInboxThread',[t.phone],'click')}><div class="sales-inbox-thread-top"><strong>${esc(t.name||('+'+t.phone))}</strong>${unread?`<b class="inbox-unread-pill">${unread}</b>`:''}</div><span>${esc(t.last?.details?.text||t.last?.event_type||'Mensagem')}</span><small>${lead?`Vinculado: ${esc(lead.title)}`:'Não vinculado'}${a?.details?.intent_level?` · ${esc(ljiInboxIntentLabel(a.details.intent_level))}`:''}</small><small>${new Date(t.last.created_at).toLocaleString('pt-BR')}</small></button>`}).join(''):'<div class="empty">Nenhuma conversa real registrada pelo webhook.</div>';
 }
 
 renderSalesInbox=function(){
@@ -3824,7 +3880,7 @@ function ljiConversationMatchHtml(phone,lead){
   if(!ev)return `<div class="inbox-match-profile"><div class="inbox-match-profile-head"><div><b>Match Comercial</b><span>Ainda não extraímos critérios de busca desta conversa.</span></div><span class="badge">Aguardando</span></div></div>`;
   const chips=ljiProfileCriterionChips(p),matches=ljiConversationAutoMatches(phone,lead),engine=String(ev.details?.engine||'');
   if(String(p?.intent_role||'').toLowerCase()==='seller')return `<div class="inbox-match-profile"><div class="inbox-match-profile-head"><div><b>Match Comercial</b><span>A conversa foi classificada como oferta/proprietário, não como busca de comprador.</span></div><span class="badge mid">Sem busca</span></div></div>`;
-  return `<div class="inbox-match-profile"><div class="inbox-match-profile-head"><div><b>Match Comercial</b><span>${esc(p?.summary||'Critérios extraídos somente do que foi informado pelo cliente.')}</span></div><span class="badge good">${esc(engine.startsWith('anthropic:')?'Claude':'Extração local')}</span></div>${chips?`<div class="inbox-match-criteria">${chips}</div>`:'<div class="small">Nenhum critério objetivo foi dito ainda; os dados cadastrados do comprador podem continuar sendo usados no cruzamento.</div>'}${matches.length?`<div class="inbox-auto-matches">${matches.map(m=>`<div class="inbox-auto-match"><div class="inbox-auto-match-score">${m.score}%</div><div><strong>${esc(m.owner.title||'Imóvel')}</strong><small>${esc([m.owner.neighborhood,m.owner.city].filter(Boolean).join(' · ')||'Região não informada')} · ${esc(money(m.owner.price||0))}</small></div>${propertyUrl(m.owner)?`<a href="${esc(propertyUrl(m.owner))}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>`:'<span></span>'}</div>`).join('')}</div>`:'<div class="small" style="margin-top:8px">Nenhum imóvel real atingiu 60% de aderência com os dados atuais.</div>'}</div>`;
+  return `<div class="inbox-match-profile"><div class="inbox-match-profile-head"><div><b>Match Comercial</b><span>${esc(p?.summary||'Critérios extraídos somente do que foi informado pelo cliente.')}</span></div><span class="badge good">${esc(engine.startsWith('anthropic:')?'Claude':'Extração local')}</span></div>${chips?`<div class="inbox-match-criteria">${chips}</div>`:'<div class="small">Nenhum critério objetivo foi dito ainda; os dados cadastrados do comprador podem continuar sendo usados no cruzamento.</div>'}${matches.length?`<div class="inbox-auto-matches">${matches.map(m=>`<div class="inbox-auto-match"><div class="inbox-auto-match-score">${m.score}%</div><div><strong>${esc(m.owner.title||'Imóvel')}</strong><small>${esc([m.owner.neighborhood,m.owner.city].filter(Boolean).join(' · ')||'Região não informada')} · ${esc(money(m.owner.price||0))}</small></div>${propertyUrl(m.owner)?`<a href="${esc(safeHttpUrl(propertyUrl(m.owner)))}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>`:'<span></span>'}</div>`).join('')}</div>`:'<div class="small" style="margin-top:8px">Nenhum imóvel real atingiu 60% de aderência com os dados atuais.</div>'}</div>`;
 }
 const _ljiInboxIntelligenceHtmlV2246=ljiInboxIntelligenceHtml;
 ljiInboxIntelligenceHtml=function(phone){const lead=ljiInboxLinkedLead(phone);return _ljiInboxIntelligenceHtmlV2246(phone)+ljiConversationMatchHtml(phone,lead)};
@@ -3890,7 +3946,7 @@ function manualCaptureDetails(d){
   money(d.estimated_sale_commission)?['Comissão estimada',money(d.estimated_sale_commission)]:null
  ].filter(Boolean);
  const chips=bits.map(([k,v])=>`<span class="mc-chip"><b>${esc(k)}:</b> ${esc(v)}</span>`).join('');
- const wa=d.whatsapp_link?`<a class="mc-wa" href="${esc(d.whatsapp_link)}" target="_blank" rel="noopener">Abrir WhatsApp do proprietário</a>`:'';
+ const wa=d.whatsapp_link?`<a class="mc-wa" href="${esc(safeHttpUrl(d.whatsapp_link))}" target="_blank" rel="noopener">Abrir WhatsApp do proprietário</a>`:'';
  return `${chips?`<div class="mc-chips">${chips}</div>`:''}${wa}`;
 }
 

@@ -47,6 +47,13 @@ const PROFILE_FIELDS = [
   "timeline_days",
 ] as const;
 
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(input, { ...init, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
+}
+
 export function clean(v: unknown, max = 120): string | null {
   const s = String(v ?? "").trim();
   return s ? s.slice(0, max) : null;
@@ -182,7 +189,7 @@ export function heuristicProfile(transcript: string, lead: any): Profile {
   };
 }
 
-export function normalizeProfile(p: any): Profile {
+export function normalizeProfile(p: any, clientText = ""): Profile {
   const allowedTx = ["sale", "rent", "both"];
   const allowedRole = ["buyer", "seller", "unknown"];
   const allowedConf = ["strong", "partial", "limited"];
@@ -195,9 +202,10 @@ export function normalizeProfile(p: any): Profile {
   if (p?.source_evidence && typeof p.source_evidence === "object") {
     for (const k of explicit) {
       const v = clean(p.source_evidence[k], 90);
-      if (v) evidence[k] = v;
+      if (v && (!clientText || clientText.toLocaleLowerCase().includes(v.toLocaleLowerCase()))) evidence[k] = v;
     }
   }
+  const verifiedExplicit = explicit.filter((k: string) => !clientText || Boolean(evidence[k]));
 
   return {
     intent_role: allowedRole.includes(p?.intent_role) ? p.intent_role : "unknown",
@@ -217,7 +225,7 @@ export function normalizeProfile(p: any): Profile {
     avoid: Array.isArray(p?.avoid)
       ? (p.avoid.map((x: any) => clean(x, 80)).filter(Boolean) as string[]).slice(0, 8)
       : [],
-    explicit_fields: explicit,
+    explicit_fields: verifiedExplicit,
     source_evidence: evidence,
     summary: clean(p?.summary, 240) || "Critérios extraídos da conversa real.",
     confidence: allowedConf.includes(p?.confidence) ? p.confidence : "partial",
@@ -248,7 +256,7 @@ export async function extractProfileWithClaude(
   const system = `Você extrai requisitos imobiliários de conversas reais para o LJ Sales. REGRA ABSOLUTA: nunca invente, complete ou deduza um critério que o CLIENTE não declarou. Mensagens da EQUIPE podem dar contexto, mas um campo só entra em explicit_fields se o CLIENTE confirmou ou informou aquele valor. Use null quando ausente. intent_role: buyer, seller ou unknown. transaction_type: sale, rent, both ou null. property_type em português. urgency 1..3 somente se houver prazo/timing explícito. source_evidence deve conter trechos curtos do CLIENTE (máx 90 caracteres por campo). Retorne SOMENTE JSON válido com: intent_role, transaction_type, city, neighborhood, property_type, budget_max, bedrooms_min, parking_min, area_min, urgency, timeline_days, must_haves[], avoid[], explicit_fields[], source_evidence{}, summary, confidence (strong|partial|limited).`;
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
@@ -263,7 +271,7 @@ export async function extractProfileWithClaude(
     const out = await r.json();
     const raw = String(out?.content?.find((x: any) => x.type === "text")?.text || "").trim();
     const parsed = JSON.parse(raw.replace(/^```json\s*|\s*```$/g, ""));
-    return { profile: normalizeProfile(parsed), engine: `anthropic:${model}` };
+    return { profile: normalizeProfile(parsed, clientText), engine: `anthropic:${model}` };
   } catch (e) {
     console.error("extractProfileWithClaude failed, using heuristic fallback", e);
     return { profile: fallback, engine: "heuristic_fallback" };
