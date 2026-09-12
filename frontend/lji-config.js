@@ -38,119 +38,25 @@ const LJI_IS_MOBILE_DEVICE = (() => {
 })();
 window.LJI_IS_MOBILE_DEVICE = LJI_IS_MOBILE_DEVICE;
 
-// Identidade visual aprovada em 08/09/2026.
-// Desktop v23/v24 e Mobile v25 são camadas isoladas para preservar a operação existente.
-(function loadApprovedLayouts(){
-  if (!document.querySelector('link[data-lji-desktop-v23]')) {
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = 'desktop-layout-v23.css?v=20260908-1';
-    css.dataset.ljiDesktopV23 = '1';
-    document.head.appendChild(css);
-  }
-  if (!document.querySelector('link[data-lji-desktop-v23-hotfix]')) {
-    const cssFix = document.createElement('link');
-    cssFix.rel = 'stylesheet';
-    cssFix.href = 'desktop-layout-v23-hotfix.css?v=20260908-1';
-    cssFix.dataset.ljiDesktopV23Hotfix = '1';
-    document.head.appendChild(cssFix);
-  }
-  if (!document.querySelector('link[data-lji-desktop-login-polish-v23]')) {
-    const cssPolish = document.createElement('link');
-    cssPolish.rel = 'stylesheet';
-    cssPolish.href = 'desktop-login-polish-v23.css?v=20260908-4';
-    cssPolish.dataset.ljiDesktopLoginPolishV23 = '1';
-    document.head.appendChild(cssPolish);
-  }
-  if (!document.querySelector('link[data-lji-dashboard-v24]')) {
-    const dashCss = document.createElement('link');
-    dashCss.rel = 'stylesheet';
-    dashCss.href = 'dashboard-v24.css?v=20260908-1';
-    dashCss.dataset.ljiDashboardV24 = '1';
-    document.head.appendChild(dashCss);
-  }
-  if (LJI_IS_MOBILE_DEVICE && !document.querySelector('link[data-lji-mobile-v25]')) {
-    const mobileCss = document.createElement('link');
-    mobileCss.rel = 'stylesheet';
-    mobileCss.href = 'mobile-v25.css?v=20260908-2';
-    mobileCss.dataset.ljiMobileV25 = '1';
-    document.head.appendChild(mobileCss);
-  }
-  if (!document.querySelector('script[data-lji-desktop-v23]')) {
-    const ui = document.createElement('script');
-    ui.src = 'desktop-layout-v23.js?v=20260908-1';
-    ui.async = false;
-    ui.dataset.ljiDesktopV23 = '1';
-    ui.onerror = () => console.error('LJ Radar: desktop-layout-v23.js não carregou.');
-    document.head.appendChild(ui);
-  }
-  if (!document.querySelector('script[data-lji-desktop-login-guard-v23]')) {
-    const loginGuard = document.createElement('script');
-    loginGuard.src = 'desktop-login-guard-v23.js?v=20260908-1';
-    loginGuard.async = false;
-    loginGuard.dataset.ljiDesktopLoginGuardV23 = '1';
-    loginGuard.onerror = () => console.error('LJ Radar: desktop-login-guard-v23.js não carregou.');
-    document.head.appendChild(loginGuard);
-  }
-  if (!document.querySelector('script[data-lji-desktop-logo-v23]')) {
-    const logo = document.createElement('script');
-    logo.src = 'desktop-logo-v23.js?v=20260908-2';
-    logo.async = false;
-    logo.dataset.ljiDesktopLogoV23 = '1';
-    logo.onerror = () => console.error('LJ Radar: desktop-logo-v23.js não carregou.');
-    document.head.appendChild(logo);
-  }
-  if (!document.querySelector('script[data-lji-desktop-login-polish-v23]')) {
-    const polish = document.createElement('script');
-    polish.src = 'desktop-login-polish-v23.js?v=20260908-4';
-    polish.async = false;
-    polish.dataset.ljiDesktopLoginPolishV23 = '1';
-    polish.onerror = () => console.error('LJ Radar: desktop-login-polish-v23.js não carregou.');
-    document.head.appendChild(polish);
-  }
-  if (!document.querySelector('script[data-lji-dashboard-v24]')) {
-    const dash = document.createElement('script');
-    dash.src = 'dashboard-v24.js?v=20260908-1';
-    dash.async = false;
-    dash.dataset.ljiDashboardV24 = '1';
-    dash.onerror = () => console.error('LJ Radar: dashboard-v24.js não carregou.');
-    document.head.appendChild(dash);
-  }
-  if (LJI_IS_MOBILE_DEVICE && !document.querySelector('script[data-lji-mobile-v25]')) {
-    const mobile = document.createElement('script');
-    mobile.src = 'mobile-v25.js?v=20260908-2';
-    mobile.async = false;
-    mobile.dataset.ljiMobileV25 = '1';
-    mobile.onerror = () => console.error('LJ Radar: mobile-v25.js não carregou.');
-    document.head.appendChild(mobile);
-  }
-})();
+/*
+ * IMPORTANTE — v30.0.3
+ * O login aprovado é montado exclusivamente por frontend/index.html.
+ * NÃO carregar aqui nenhuma camada visual de autenticação antiga.
+ *
+ * Antes, este arquivo reinjetava em runtime:
+ * - desktop-layout-v23.js
+ * - desktop-login-guard-v23.js
+ * - desktop-login-polish-v23.js
+ * - mobile-v25.js (incluindo builder de login)
+ * - approved-layout-bootstrap-v26.js
+ *
+ * Essas reinjeções reconstruíam #ljiAuthOverlay depois do primeiro paint e eram
+ * a causa direta da alternância/pisca-pisca entre o login aprovado e o legado.
+ * O index atual é a única autoridade da composição visual de autenticação.
+ */
+window.LJI_LOGIN_LAYOUT_OWNER = 'index-v30';
 
-// Bootstrap tardio e determinístico. É carregado depois que app-auth.js teve chance
-// de montar/reconstruir o overlay, eliminando o retorno do login legado no Cloudflare.
-(function loadApprovedLayoutBootstrap(){
-  let loaded = false;
-  const load = () => {
-    if (loaded || document.querySelector('script[data-lji-approved-bootstrap-v26]')) return;
-    loaded = true;
-    const s = document.createElement('script');
-    s.src = 'approved-layout-bootstrap-v26.js?v=20260909-2';
-    s.async = false;
-    s.dataset.ljiApprovedBootstrapV26 = '1';
-    s.onerror = () => {
-      loaded = false;
-      console.error('LJ Radar: approved-layout-bootstrap-v26.js não carregou.');
-    };
-    (document.head || document.documentElement).appendChild(s);
-  };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load, {once:true});
-  else setTimeout(load, 0);
-  window.addEventListener('load', load, {once:true});
-  setTimeout(load, 1200);
-})();
-
-// Camadas pequenas e isoladas carregadas depois que app-core.js/app-backend.js
-// já definiram as funções. Evita reescrever o arquivo principal e reduz regressão.
+// Camadas funcionais pequenas e isoladas, sem responsabilidade pelo layout do login.
 window.addEventListener('load', () => {
   if (!document.querySelector('script[data-lji-quality-gates]')) {
     const quality = document.createElement('script');
