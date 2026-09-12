@@ -13,8 +13,8 @@
 <div class="lji-boot">Carregando LJ Radar Imob…</div>
 <script>
 (async function boot(){
-  const BUILD='31.0.1';
-  const BUST='20260911-approved-login-image-live';
+  const BUILD='31.0.2';
+  const BUST='20260912-security-data-mobile';
 
   function appendCss(doc,href,media){const link=doc.createElement('link');link.rel='stylesheet';link.href=href;if(media)link.media=media;doc.head.appendChild(link);}
   function appendScript(doc,src){const s=doc.createElement('script');s.src=src;doc.body.appendChild(s);}
@@ -102,6 +102,9 @@
     appendCss(doc,'./gmail-system-v29-5.css?v='+BUILD);
     appendCss(doc,'./responsive-consistency-v29-6.css?v='+BUILD);
     appendCss(doc,'./login-approved-image-v31.css?v='+BUILD);
+    // The approved image owns the login surface. The mobile layer is still
+    // needed for the authenticated dashboard, bottom navigation and cards.
+    appendCss(doc,'./mobile-v25.css?v='+BUILD);
     buildApprovedImageAuth(doc,bg);
     appendScript(doc,'./dashboard-v24.js?v='+BUILD);
     appendScript(doc,'./capture-center-v29.js?v='+BUILD);
@@ -110,6 +113,7 @@
     appendScript(doc,'./gmail-system-v29.js?v='+BUILD);
     appendScript(doc,'./gmail-system-v29-5.js?v='+BUILD);
     appendScript(doc,'./responsive-consistency-v29-6.js?v='+BUILD);
+    appendScript(doc,'./mobile-v25.js?v='+BUILD);
     const behavior=doc.createElement('script');
     behavior.textContent="document.addEventListener('click',function(e){const info=document.querySelector('#ljiAuthOverlay .auth-info');if(e.target.closest('[data-lji-request-access]')&&info){info.textContent='Solicite a liberação ao administrador do workspace LJ Radar Imob.';info.style.display='block';}});";
     doc.body.appendChild(behavior);
@@ -123,3 +127,4 @@
 </script>
 </body>
 </html>
+
